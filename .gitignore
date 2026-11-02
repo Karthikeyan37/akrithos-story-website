@@ -1,9 +1,9 @@
 /node_modules
 /.next/
 /out/
-.env
-.env.local
-.env.*.local
+# Every env file holds secrets except the committed template.
+.env*
+!.env.example
 *.tsbuildinfo
 next-env.d.ts
 .DS_Store

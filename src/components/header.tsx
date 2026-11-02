@@ -38,7 +38,7 @@ export function Header() {
     <header className="site-header" data-scrolled={scrolled || menuOpen}>
       <div className="site-header-inner">
         <a href="#top" aria-label="Akrithos home" className="site-logo">
-          <Image src="/akrithos-logo-header-night.png" alt="Akrithos" width={956} height={285} priority />
+          <Image src="/akrithos-logo-full-night.png" alt="Akrithos: precision at speed" width={964} height={394} priority />
         </a>
 
         <nav aria-label="Primary navigation" className="site-nav">
