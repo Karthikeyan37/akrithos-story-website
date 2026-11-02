@@ -1,0 +1,190 @@
+[
+  {
+    "name": "motion-hero-1920",
+    "viewport": {
+      "width": 1920,
+      "height": 1080,
+      "pointer": [
+        1320,
+        420
+      ]
+    },
+    "overflow": 0,
+    "motionMode": "full",
+    "visibleSections": 1,
+    "animationNames": [
+      "global-signal-breathe",
+      "journey-signal-scan",
+      "section-signal-pass",
+      "hero-signal-heartbeat",
+      "hero-signal-ring",
+      "canvas-orbit",
+      "canvas-orbit-reverse",
+      "canvas-signal-travel",
+      "flow-stage-route",
+      "signal-ribbon-travel",
+      "control-status-breathe",
+      "outcome-model-in",
+      "outcome-signal",
+      "security-field-turn",
+      "security-state-pulse",
+      "assistant-signal-in"
+    ],
+    "movingAnimations": [
+      "global-signal-breathe",
+      "global-signal-breathe",
+      "journey-signal-scan",
+      "section-signal-pass",
+      "hero-signal-heartbeat",
+      "hero-signal-ring",
+      "canvas-orbit",
+      "canvas-orbit-reverse",
+      "canvas-signal-travel",
+      "flow-stage-route",
+      "signal-ribbon-travel"
+    ],
+    "firstSha256": "02391293c333e0f80f46cda06db0729c419deb5a8222e153ca8448c41e6fe8c7",
+    "secondSha256": "09f393111af6ef009b3c023d832cb9592efc70f6a25bc1f4fd5e52f75e28e20e",
+    "frameChanged": true,
+    "errors": []
+  },
+  {
+    "name": "motion-platform-1440",
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "hash": "#platform",
+      "wait": 1200
+    },
+    "overflow": 0,
+    "motionMode": "full",
+    "visibleSections": 1,
+    "animationNames": [
+      "global-signal-breathe",
+      "journey-signal-scan",
+      "hero-signal-heartbeat",
+      "hero-signal-ring",
+      "canvas-orbit",
+      "canvas-orbit-reverse",
+      "canvas-signal-travel",
+      "flow-stage-route",
+      "signal-ribbon-travel",
+      "section-signal-pass",
+      "control-status-breathe",
+      "control-node-signal",
+      "outcome-model-in",
+      "outcome-signal",
+      "security-field-turn",
+      "security-state-pulse",
+      "assistant-signal-in"
+    ],
+    "movingAnimations": [
+      "global-signal-breathe",
+      "global-signal-breathe",
+      "journey-signal-scan",
+      "signal-ribbon-travel",
+      "section-signal-pass",
+      "control-status-breathe"
+    ],
+    "firstSha256": "e079ec79db651bb2ed7b7ad4980f7ed87afb552421cf93f5fc6ed59623bb9edb",
+    "secondSha256": "be44cef153a265b9b1fa4e6b79783e53d8797d5347a843f4bbb92bb2502e07ad",
+    "frameChanged": true,
+    "errors": []
+  },
+  {
+    "name": "motion-security-1440",
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "hash": "#security"
+    },
+    "overflow": 0,
+    "motionMode": "full",
+    "visibleSections": 2,
+    "animationNames": [
+      "global-signal-breathe",
+      "journey-signal-scan",
+      "hero-signal-heartbeat",
+      "hero-signal-ring",
+      "canvas-orbit",
+      "canvas-orbit-reverse",
+      "canvas-signal-travel",
+      "flow-stage-route",
+      "signal-ribbon-travel",
+      "control-status-breathe",
+      "outcome-model-in",
+      "outcome-signal",
+      "section-signal-pass",
+      "security-field-turn",
+      "security-state-pulse",
+      "assistant-signal-in"
+    ],
+    "movingAnimations": [
+      "global-signal-breathe",
+      "global-signal-breathe",
+      "journey-signal-scan",
+      "signal-ribbon-travel",
+      "section-signal-pass",
+      "security-field-turn",
+      "security-state-pulse",
+      "security-state-pulse",
+      "security-state-pulse",
+      "security-state-pulse",
+      "section-signal-pass"
+    ],
+    "firstSha256": "56985c022bbfd4dfcb225506c096bc66461e61c0eb58254e3b06596285ab53be",
+    "secondSha256": "9fdb8934ef0ace3d0548e16473efdee759deaa23c0b95eab4cc6710afad3a15c",
+    "frameChanged": true,
+    "errors": []
+  },
+  {
+    "name": "motion-mobile-393",
+    "viewport": {
+      "width": 393,
+      "height": 852,
+      "hasTouch": true
+    },
+    "overflow": 0,
+    "motionMode": "full",
+    "visibleSections": 1,
+    "animationNames": [
+      "journey-signal-scan",
+      "section-signal-pass",
+      "hero-signal-heartbeat",
+      "hero-signal-ring",
+      "signal-ribbon-travel",
+      "control-status-breathe",
+      "outcome-model-in",
+      "security-field-turn",
+      "security-state-pulse"
+    ],
+    "movingAnimations": [
+      "journey-signal-scan",
+      "section-signal-pass",
+      "hero-signal-heartbeat",
+      "hero-signal-ring",
+      "signal-ribbon-travel"
+    ],
+    "firstSha256": "d670110f23be4cdc02ca4d82efab71ef1144214eeb5196ff947b1694a4206b82",
+    "secondSha256": "13a3a8e7300344fb65ae1cd0fe109400878555fb09285184318575d22ea6970e",
+    "frameChanged": true,
+    "errors": []
+  },
+  {
+    "name": "motion-reduced-1440",
+    "viewport": {
+      "width": 1440,
+      "height": 1000,
+      "reduced": true
+    },
+    "overflow": 0,
+    "motionMode": "reduced",
+    "visibleSections": 1,
+    "animationNames": [],
+    "movingAnimations": [],
+    "firstSha256": "39a59ee4227cffd0b4d93d6a5d4b3bb9367c62d4722e29e140ddb3d14f250495",
+    "secondSha256": "39a59ee4227cffd0b4d93d6a5d4b3bb9367c62d4722e29e140ddb3d14f250495",
+    "frameChanged": false,
+    "errors": []
+  }
+]
