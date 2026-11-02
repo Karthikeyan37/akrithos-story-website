@@ -13,12 +13,13 @@ import { knownVisitor, saveLeadToken, track } from "@/lib/track";
 type ChatMessage = { role: "user" | "assistant"; content: string };
 type Next = "quest" | "book" | "training" | "blueprint" | "showcase" | "none";
 
-const SECTIONS = ["top", "platform", "quest", "live-agent", "security", "diagnostic", "team", "live-program", "faq"] as const;
+const SECTIONS = ["top", "quest", "story", "platform", "live-agent", "security", "diagnostic", "team", "live-program", "faq"] as const;
 const STARTERS: Record<string, string[]> = {
   top: ["Chasing and qualifying leads", "Answering the same questions", "Paperwork and approvals", "Customer requests"],
+  story: ["Which agent fits a small team?", "Can our data stay in our region?", "Where do people stay in control?"],
   platform: ["Which agent fits a small team?", "Where do people stay in control?", "How long does a first agent take?"],
   quest: ["What does my level mean?", "What happens in the Diagnostic?", "Can I start with training?"],
-  "live-agent": ["What makes a good workflow to automate?", "What should I not type in here?"],
+  "live-agent": ["What makes a good task to hand to an agent?", "What should I not type in here?"],
   security: ["Can our data stay in our region?", "Who approves what an agent does?"],
   diagnostic: ["What should I bring to the Diagnostic?", "What do I leave with?"],
   team: ["Who is behind Akrithos?", "How do you work with clients?"],

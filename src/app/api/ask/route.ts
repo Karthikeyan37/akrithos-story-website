@@ -65,7 +65,7 @@ function validHistory(value: unknown): value is ChatMessage[] {
     m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string" && m.content.trim().length > 0 && m.content.length <= MAX_MESSAGE_LENGTH);
 }
 
-const SECTIONS = new Set(["top", "platform", "quest", "live-agent", "security", "diagnostic", "team", "live-program", "faq"]);
+const SECTIONS = new Set(["top", "quest", "story", "platform", "live-agent", "security", "diagnostic", "team", "live-program", "faq"]);
 /** Only known values from the page: the section in view and the quest result, never free text. */
 function sessionContext(raw: unknown): string {
   if (!raw || typeof raw !== "object") return "";

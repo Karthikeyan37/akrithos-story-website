@@ -7,13 +7,14 @@ import { useEffect, useRef } from "react";
  * centred, then lifts and fades as the next arrives. A quiet rail marks the chapter in view. Writes CSS variables
  * once per frame; reduced motion leaves everything still and fully visible.
  */
-export function StoryDepth({ storyId = "top", chapters }: { storyId?: string; chapters: number }) {
+export function StoryDepth({ chapters }: { chapters: number }) {
   const railRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const story = document.getElementById(storyId);
-    if (!story || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const list = Array.from(story.querySelectorAll<HTMLElement>("[data-chapter]"));
+    // The story is split around Agent Quest, so every `.story` section takes part.
+    const stories = Array.from(document.querySelectorAll<HTMLElement>("main .story"));
+    if (!stories.length || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const list = stories.flatMap((s) => Array.from(s.querySelectorAll<HTMLElement>("[data-chapter]")));
     const ticks = Array.from(railRef.current?.children ?? []) as HTMLElement[];
     let frame = 0;
     const update = () => {
@@ -29,10 +30,10 @@ export function StoryDepth({ storyId = "top", chapters }: { storyId?: string; ch
         if (Math.abs(d) < best) { best = Math.abs(d); nearest = i; }
       });
       ticks.forEach((t, i) => { t.dataset.on = String(i === nearest); });
-      if (railRef.current) railRef.current.dataset.visible = String(story.getBoundingClientRect().bottom > vh * 0.6);
+      if (railRef.current) railRef.current.dataset.visible = String(stories.some((s) => { const r = s.getBoundingClientRect(); return r.top < vh * 0.5 && r.bottom > vh * 0.5; }));
     };
     const queue = () => { if (!frame) frame = requestAnimationFrame(update); };
-    story.dataset.depth = "on";
+    stories.forEach((s) => { s.dataset.depth = "on"; });
     queue();
     window.addEventListener("scroll", queue, { passive: true });
     window.addEventListener("resize", queue);
@@ -40,9 +41,9 @@ export function StoryDepth({ storyId = "top", chapters }: { storyId?: string; ch
       window.removeEventListener("scroll", queue);
       window.removeEventListener("resize", queue);
       if (frame) cancelAnimationFrame(frame);
-      delete story.dataset.depth;
+      stories.forEach((s) => { delete s.dataset.depth; });
     };
-  }, [storyId]);
+  }, []);
 
   return (
     <div ref={railRef} className="story-rail" data-visible="true" aria-hidden="true">

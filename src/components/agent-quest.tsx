@@ -31,8 +31,26 @@ export function AgentQuest() {
   const agentIndex = answers.bottleneck ? result.agent?.index ?? -1 : -1;
   const value = current.kind === "choice" ? answers[current.id] : undefined;
   const insight = current.kind === "choice" ? current.choices.find((c) => c.id === value)?.insight : picked[round]
-    ? `That is about ${((answers.hours ?? 0) * 48).toLocaleString("en-US")} hours a year. If even a third of it follows a pattern, an agent can carry it.`
+    ? `That is about ${((answers.hours ?? 0) * 48).toLocaleString("en-US")} hours a year. If even a third of it is repeat work, an agent can take it on.`
     : undefined;
+
+  // Started from the hero: question one arrives already answered, with its insight showing.
+  useEffect(() => {
+    const onStart = (e: Event) => {
+      const id = (e as CustomEvent<{ choiceId?: string }>).detail?.choiceId;
+      const first = ROUNDS[0];
+      setDone(false);
+      setRound(0);
+      if (id && first.kind === "choice" && first.choices.some((c) => c.id === id)) {
+        setAnswers((a) => ({ ...a, [first.id]: id }));
+        setPicked((p) => ({ ...p, 0: true }));
+        setFlash(`+${XP_PER_ROUND} XP · ${first.badge}`);
+      }
+      window.setTimeout(() => nextRef.current?.focus({ preventScroll: true }), 450);
+    };
+    window.addEventListener("akrithos:quest-start", onStart);
+    return () => window.removeEventListener("akrithos:quest-start", onStart);
+  }, []);
 
   useEffect(() => { if (flash) { const t = window.setTimeout(() => setFlash(null), 1600); return () => window.clearTimeout(t); } }, [flash]);
 
@@ -178,14 +196,14 @@ function QuestResult({ result, answers, onBook, onReplay }: { result: Result; an
         </div>
       ) : null}
       <p className="quest-hours-at-stake">
-        From your estimate, about <b>{result.hoursPerYear.toLocaleString("en-US")} hours a year</b> go into this work. The Diagnostic measures how much of it an agent can carry.
+        From your estimate, about <b>{result.hoursPerYear.toLocaleString("en-US")} hours a year</b> go into this work. In the Diagnostic, we work out how much of it an agent can take on.
       </p>
 
       <div className="quest-next">
         {result.path === "diagnostic" ? (
           <button type="button" className="button button-primary" onClick={onBook}>Book your Diagnostic</button>
         ) : result.path === "blueprint" ? (
-          <a className="button button-primary" href="#live-agent">Sketch it in the blueprint builder</a>
+          <a className="button button-primary" href="#live-agent">Sketch your agent in the planner</a>
         ) : (
           <a className="button button-primary" href={integrations.trainingUrl} onClick={() => track("viewed-training")}>Learn to build agents live</a>
         )}

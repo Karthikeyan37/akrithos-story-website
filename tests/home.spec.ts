@@ -9,14 +9,14 @@ const links = {
   form: "https://api.leadconnectorhq.com/widget/form/NF6k2MmqcnTNqAfG3Fxd",
 } as const;
 const MOCK = "http://127.0.0.1:3999/__calls";
-const sectionIds = ["top", "platform", "quest", "live-agent", "security", "diagnostic", "team", "live-program", "faq"];
+const sectionIds = ["top", "quest", "story", "platform", "live-agent", "security", "diagnostic", "team", "live-program", "faq"];
 
 test("the story, the sections and the people are all there", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/Akrithos/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Your best people are buried in work a machine should do.");
   expect(await page.locator("main > section").evaluateAll((s) => s.map((x) => x.id))).toEqual(sectionIds);
-  await expect(page.locator("#top [data-chapter]")).toHaveCount(5);
+  await expect(page.locator("main .story [data-chapter]")).toHaveCount(5);
   await expect(page.locator("#team img")).toHaveCount(3);
   // The 3D world either draws or leaves the poster; it never leaves the page broken.
   await expect.poll(() => page.locator(".world").getAttribute("data-state"), { timeout: 30_000 }).toMatch(/ready|failed/);
@@ -36,10 +36,10 @@ test("four systems show the business effect and where people decide", async ({ p
   const showcase = page.locator("#platform");
   await expect(showcase.getByRole("tab")).toHaveCount(4);
   for (const [tab, output, gate] of [
-    [/Revenue agent/, "Opportunity brief", "Sales confirms qualification"],
-    [/Knowledge copilot/, "Grounded answer", "Expert reviews low confidence"],
-    [/Operations control/, "Decision packet", "Named owner approves action"],
-    [/Service agent/, "Resolved or routed", "Your team owns sensitive moments"],
+    [/Revenue agent/, "A ready-to-call note", "Your sales team says yes"],
+    [/Knowledge copilot/, "A clear answer", "An expert checks anything unsure"],
+    [/Operations control/, "Ready to approve", "The right person approves"],
+    [/Service agent/, "Solved or passed on", "Your team handles sensitive moments"],
   ] as const) {
     await showcase.getByRole("tab", { name: tab }).click();
     await expect(showcase.getByText(output, { exact: true })).toBeVisible();
@@ -136,10 +136,10 @@ test("navigation and FAQ work at every width without sideways scroll", async ({ 
 test("the workflow blueprint is still one click away", async ({ page }) => {
   await page.goto("/#live-agent");
   await page.getByRole("button", { name: "Invoice approval" }).click();
-  await expect(page.getByLabel("Describe a business workflow")).toHaveValue("Invoices over an agreed threshold need the correct approval before their due date.");
+  await expect(page.getByLabel("Describe a task your team repeats")).toHaveValue("Invoices over an agreed amount need the right person to approve them before they are due.");
   await page.getByRole("button", { name: "Generate the preview" }).click();
   await expect(page.getByText(/Illustrative example|AI-generated draft/)).toBeVisible();
-  await expect(page.getByText("Human review point")).toBeVisible();
+  await expect(page.getByText("Where a person checks", { exact: true })).toBeVisible();
 });
 
 test("reduced motion keeps the showcase complete and still", async ({ page }) => {
@@ -147,31 +147,40 @@ test("reduced motion keeps the showcase complete and still", async ({ page }) =>
   await page.goto("/#platform");
   const showcase = page.locator("#platform");
   expect(await showcase.locator(".showcase-route-live").evaluate((el) => getComputedStyle(el).animationName)).toBe("none");
-  await expect(showcase.getByText("Opportunity brief", { exact: true })).toBeVisible();
+  await expect(showcase.getByText("A ready-to-call note", { exact: true })).toBeVisible();
 });
 
-test("on a large screen, scrolling walks the pinned showcase through all four systems", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop-chromium", "the pinned scroll story is for large screens");
+test("the showcase never moves on by itself, and plays again on request", async ({ page }) => {
+  await page.goto("/#platform");
+  const showcase = page.locator("#platform");
+  const stage = showcase.locator(".showcase-stage");
+  await expect(showcase.getByRole("tab", { name: /Revenue agent/ })).toHaveAttribute("aria-selected", "true");
+  await expect(stage).toHaveAttribute("data-step", "3", { timeout: 15_000 });
+  await page.waitForTimeout(4000);
+  await expect(showcase.getByRole("tab", { name: /Revenue agent/ })).toHaveAttribute("aria-selected", "true");
+  await expect(stage).toHaveAttribute("data-step", "3");
+  await showcase.getByRole("button", { name: "Play again" }).click();
+  await expect(stage).toHaveAttribute("data-step", "0");
+  await expect(showcase.locator(".showcase-now")).toHaveText(/Work comes in/);
+});
+
+test("the first screen starts Agent Quest with the answer kept", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "the first-screen question shows on wide screens; phones get the quest next");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
+  const opener = page.locator(".hero-quest");
+  await opener.getByRole("button", { name: "Financial services" }).click();
+  const quest = page.locator("#quest");
+  await expect(quest.getByRole("button", { name: "Financial services" })).toHaveAttribute("aria-pressed", "true");
+  await expect(quest.getByRole("button", { name: "Next round" })).toBeEnabled();
+  await expect(quest.getByRole("button", { name: "Next round" })).toBeFocused();
+});
+
+test("picking an agent in the story opens that agent below", async ({ page }) => {
+  await page.goto("/#story");
+  await page.getByRole("group", { name: "Pick an agent to see how it works" }).getByRole("button", { name: /Catches problems early/ }).click();
   const showcase = page.locator("#platform");
-  await expect(showcase).toHaveAttribute("data-mode", "scroll");
-  const scrollStory = (fraction: number) => page.evaluate((f) => {
-    const track = document.querySelector<HTMLElement>("#platform .showcase-track")!;
-    const pin = document.querySelector<HTMLElement>("#platform .showcase-pin")!;
-    const top = parseFloat(getComputedStyle(pin).top) || 0;
-    const travel = track.offsetHeight - pin.offsetHeight;
-    window.scrollTo({ top: window.scrollY + track.getBoundingClientRect().top - top + travel * f, behavior: "instant" });
-  }, fraction);
-  for (const [i, name] of ["Revenue agent", "Knowledge copilot", "Operations control", "Service agent"].entries()) {
-    await scrollStory((i + 0.9) / 4);
-    await expect(showcase.getByRole("tab", { name })).toHaveAttribute("aria-selected", "true");
-    await expect(showcase.locator(".showcase-stage")).toHaveAttribute("data-step", "3");
-  }
-  await scrollStory(0.02);
-  await expect(showcase.locator(".showcase-stage")).toHaveAttribute("data-step", "0");
-  // A tab still jumps straight to its system, with the work finished and in view.
-  await showcase.getByRole("tab", { name: "Operations control" }).click();
-  await expect(showcase.getByText("Named owner approves action", { exact: true })).toBeInViewport();
-  await expect(showcase.locator(".showcase-stage")).toHaveAttribute("data-step", "3");
+  await expect(showcase.getByRole("tab", { name: /Operations control/ })).toHaveAttribute("aria-selected", "true");
+  await expect(showcase.getByRole("tab", { name: /Operations control/ })).toBeInViewport();
+  await expect(showcase.getByRole("tabpanel")).toBeInViewport();
 });

@@ -15,12 +15,12 @@ export const ROUNDS: Round[] = [
     prompt: "First, who are we helping?",
     badge: "Mission set",
     choices: [
-      { id: "healthcare", label: "Healthcare or home care", insight: "Care teams lose hours to intake, scheduling and the same family questions. Agents can carry the admin while clinicians keep the care." },
-      { id: "finance", label: "Financial services", insight: "Finance teams spend days on reconciliations, document checks and approvals that follow clear rules. That is exactly where agents shine." },
-      { id: "government", label: "Government or public sector", insight: "Public teams handle high volumes of the same requests under strict rules. Agents work well here when every action is logged and reviewed." },
-      { id: "services", label: "Professional services", insight: "Firms bill for expertise, yet lose hours to proposals, intake and status updates. Agents give that time back to client work." },
+      { id: "healthcare", label: "Healthcare or home care", insight: "Care teams lose hours to paperwork, scheduling and the same family questions. Agents can do the admin so your staff can focus on care." },
+      { id: "finance", label: "Financial services", insight: "Finance teams spend days matching numbers, checking documents and getting sign-offs. When the rules are clear, agents do this well." },
+      { id: "government", label: "Government or public sector", insight: "Public teams handle lots of the same requests under strict rules. Agents help here, as long as every step is recorded and checked." },
+      { id: "services", label: "Professional services", insight: "Firms are paid for expertise, yet lose hours to proposals, new client forms and status updates. Agents give that time back." },
       { id: "commerce", label: "Retail or e-commerce", insight: "Orders, returns and product questions repeat all day. Agents answer instantly and hand real problems to your team." },
-      { id: "other", label: "Something else", insight: "Every business has a few workflows that repeat with small variations. We will find yours." },
+      { id: "other", label: "Something else", insight: "Every business has a few tasks that repeat, with small differences. We will find yours." },
     ],
   },
   {
@@ -29,25 +29,25 @@ export const ROUNDS: Round[] = [
     prompt: "Where does your team lose the most hours?",
     badge: "Bottleneck found",
     choices: [
-      { id: "leads", label: "Chasing and qualifying leads", insight: "A revenue agent reads every enquiry, scores it against your criteria and puts the best ones in front of sales within minutes." },
-      { id: "knowledge", label: "Answering the same questions", insight: "A knowledge copilot answers from your approved documents, cites where the answer came from and sends unclear cases to an expert." },
-      { id: "documents", label: "Documents, data entry and approvals", insight: "An operations agent extracts, checks and routes documents, and prepares each decision so a named owner can approve it in seconds." },
-      { id: "service", label: "Customer requests and follow-ups", insight: "A service agent resolves routine requests around the clock and passes sensitive moments to your people with the full context." },
-      { id: "scheduling", label: "Scheduling and coordination", insight: "An operations agent matches people, times and rules, then asks a person only when something conflicts." },
-      { id: "reporting", label: "Reports nobody has time to build", insight: "An operations agent gathers the numbers, drafts the report and flags what changed, ready for a person to sign off." },
+      { id: "leads", label: "Chasing and qualifying leads", insight: "A revenue agent reads every enquiry, picks out the ones most likely to buy, and passes them to sales within minutes." },
+      { id: "knowledge", label: "Answering the same questions", insight: "A knowledge copilot answers from documents you approve, shows where each answer came from, and asks an expert when it is unsure." },
+      { id: "documents", label: "Documents, data entry and approvals", insight: "An operations agent reads and checks documents, sends them to the right place, and gets each decision ready so the right person can approve it in seconds." },
+      { id: "service", label: "Customer requests and follow-ups", insight: "A service agent handles everyday requests day and night, and passes sensitive moments to your people with the full story." },
+      { id: "scheduling", label: "Scheduling and coordination", insight: "An operations agent matches people and times to your rules, and only asks a person when something clashes." },
+      { id: "reporting", label: "Reports nobody has time to build", insight: "An operations agent gathers the numbers, writes a first draft and points out what changed, ready for a person to sign off." },
     ],
   },
   { id: "hours", kind: "range", prompt: "Roughly how many hours a week does that take, across everyone?", badge: "Prize sized", min: 2, max: 200, step: 1, initial: 20 },
   {
     id: "knowledge",
     kind: "choice",
-    prompt: "Where does the know-how for that work live today?",
+    prompt: "Where is the know-how for that work today?",
     badge: "Knowledge mapped",
     choices: [
-      { id: "documents", label: "Written down in documents and policies", insight: "Written rules are the best starting point. An agent can work from them on day one." },
-      { id: "system", label: "Inside a CRM or core system", insight: "Structured systems make agents precise. We connect to them with the narrowest access that does the job." },
-      { id: "scattered", label: "Scattered across email, drives and chats", insight: "Common, and fixable. Part of the work is gathering the sources an agent may use, and nothing else." },
-      { id: "heads", label: "Mostly in people's heads", insight: "Then the first win is capturing it. We interview the experts and turn their judgement into rules the agent follows." },
+      { id: "documents", label: "Written down in documents and policies", insight: "Written rules are the best place to start. An agent can use them from day one." },
+      { id: "system", label: "Inside a CRM or main business system", insight: "Organised systems help agents be accurate. We give the agent only the access it needs, nothing more." },
+      { id: "scattered", label: "Scattered across email, drives and chats", insight: "Very common, and fixable. Part of the job is gathering the information the agent may use, and nothing else." },
+      { id: "heads", label: "Mostly in people's heads", insight: "Then the first win is writing it down. We talk to your experts and turn what they know into rules the agent follows." },
     ],
   },
   {
@@ -56,10 +56,10 @@ export const ROUNDS: Round[] = [
     prompt: "What has to stay inside your walls?",
     badge: "Boundary drawn",
     choices: [
-      { id: "none", label: "Nothing especially sensitive", insight: "That keeps the path simple: a secure cloud deployment with clear logs." },
-      { id: "customer", label: "Customer and staff records", insight: "We scope exactly which fields an agent may see, and keep everything else out of reach." },
-      { id: "regulated", label: "Regulated data, like health or financial records", insight: "Regional, on-premises or hybrid deployment keeps regulated data where the rules require. This is our home ground." },
-      { id: "classified", label: "Government or classified material", insight: "Our principals come from secure defence and government environments. Isolated deployments are on the table." },
+      { id: "none", label: "Nothing especially sensitive", insight: "That keeps things simple: a secure cloud setup, with every step recorded." },
+      { id: "customer", label: "Customer and staff records", insight: "We agree exactly what the agent may see, and keep everything else out of reach." },
+      { id: "regulated", label: "Regulated data, like health or money records", insight: "We can keep it in your region, on your own servers, or a mix, wherever the rules say. This is what we know best." },
+      { id: "classified", label: "Government or classified material", insight: "Our leaders come from secure defence and government work. A fully separate setup is possible." },
     ],
   },
   {
@@ -68,9 +68,9 @@ export const ROUNDS: Round[] = [
     prompt: "Before an agent acts, who should approve?",
     badge: "Gatekeeper named",
     choices: [
-      { id: "nobody", label: "Nobody, if it is low risk", insight: "Fine for low-risk steps. We still log every action so you can see what happened and why." },
+      { id: "nobody", label: "Nobody, if it is low risk", insight: "Fine for low-risk steps. We still record every step, so you can always see what happened and why." },
       { id: "lead", label: "A team lead, for anything unusual", insight: "A strong pattern: agents handle the routine, a lead approves the exceptions." },
-      { id: "expert", label: "A named expert for each kind of decision", insight: "The gold standard. Clear owners make it safe to automate more, faster." },
+      { id: "expert", label: "A named expert for each kind of decision", insight: "The best setup. When it is clear who owns each decision, it is safe to hand more to agents, sooner." },
       { id: "always", label: "Always a person, every time", insight: "A good way to start. Agents prepare the work, people press go, and trust grows from there." },
     ],
   },
@@ -80,9 +80,9 @@ export const ROUNDS: Round[] = [
     prompt: "When would you like your first agent working?",
     badge: "Clock started",
     choices: [
-      { id: "month", label: "This month", insight: "Then the Diagnostic is your fastest route: one session to define the target, the boundary and the review path." },
+      { id: "month", label: "This month", insight: "Then the Diagnostic is your fastest route: one session to agree the goal, what the agent may see, and who checks its work." },
       { id: "quarter", label: "This quarter", insight: "Plenty of time to start with one workflow, prove it, then add the next." },
-      { id: "exploring", label: "Just exploring for now", insight: "Exploring is how good projects start. Our live training shows you how agents are built, step by step." },
+      { id: "exploring", label: "Just exploring for now", insight: "Exploring is how good projects start. Our live training shows how agents are built, step by step." },
     ],
   },
 ];
@@ -90,12 +90,12 @@ export const ROUNDS: Round[] = [
 export type Answers = Partial<Record<Exclude<Round["id"], "hours">, string>> & { hours?: number };
 
 export const AGENT_FOR: Record<string, { index: number; name: string; does: string; decides: string }> = {
-  leads: { index: 0, name: "Revenue agent", does: "Reads every enquiry, scores it against your criteria and routes the best to the right person with a short brief.", decides: "Sales confirms each qualified opportunity." },
-  knowledge: { index: 1, name: "Knowledge copilot", does: "Answers from your approved documents with the source attached, and sends unclear questions to an expert.", decides: "An expert reviews low-confidence answers." },
-  documents: { index: 2, name: "Operations control", does: "Extracts and checks documents, then prepares each decision as a short packet.", decides: "A named owner approves each action." },
-  scheduling: { index: 2, name: "Operations control", does: "Matches people, times and rules, and raises only the conflicts.", decides: "A coordinator approves changes that affect people." },
+  leads: { index: 0, name: "Revenue agent", does: "Reads every enquiry, picks out the ones most likely to buy, and sends each to the right person with a short note.", decides: "Sales confirms each qualified opportunity." },
+  knowledge: { index: 1, name: "Knowledge copilot", does: "Answers from documents you approve, shows where each answer came from, and asks an expert when unsure.", decides: "An expert checks any answer it is unsure about." },
+  documents: { index: 2, name: "Operations control", does: "Reads and checks documents, then gets each decision ready in one short summary.", decides: "A named owner approves each action." },
+  scheduling: { index: 2, name: "Operations control", does: "Matches people and times to your rules, and only flags what clashes.", decides: "A coordinator approves changes that affect people." },
   reporting: { index: 2, name: "Operations control", does: "Gathers the numbers, drafts the report and flags what changed.", decides: "A manager signs the report off." },
-  service: { index: 3, name: "Service agent", does: "Resolves routine requests at any hour and hands sensitive moments to your team with the full context.", decides: "Your team owns every sensitive conversation." },
+  service: { index: 3, name: "Service agent", does: "Handles everyday requests at any hour, and passes sensitive moments to your team with the full story.", decides: "Your team owns every sensitive conversation." },
 };
 
 export const LEVELS = [

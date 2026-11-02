@@ -6,23 +6,23 @@ const startingPoints = [
   {
     id: "first",
     label: "My first agent",
-    title: "Start from the foundations.",
-    body: "Learn the decisions behind a useful agent, build each layer live, and keep the working templates.",
-    checks: ["Define the job", "Ground the knowledge", "Test the handoff"],
+    title: "Start with the basics.",
+    body: "Learn what makes an agent useful, build one with us live, and keep the templates.",
+    checks: ["Choose its job", "Give it the right information", "Test the handover to a person"],
   },
   {
     id: "workflow",
-    label: "One stubborn workflow",
-    title: "Bring a real process into focus.",
-    body: "Use the cohort method to map repeated work, identify the control points, and shape a buildable agent workflow.",
-    checks: ["Map the baseline", "Choose the boundary", "Set acceptance evidence"],
+    label: "One slow task",
+    title: "Focus on one real task.",
+    body: "Map the repeat work, decide where a person checks, and shape an agent you can actually build.",
+    checks: ["See how it works today", "Decide what the agent may see", "Agree what success looks like"],
   },
   {
     id: "team",
-    label: "A team rollout",
-    title: "Create a shared operating language.",
-    body: "Give operators and decision-makers a practical way to evaluate agents, risks, and human escalation together.",
-    checks: ["Align roles", "Expose controls", "Plan adoption"],
+    label: "My whole team",
+    title: "Get everyone on the same page.",
+    body: "Give your team and leaders a simple way to judge agents, the risks, and when a person steps in.",
+    checks: ["Agree who does what", "Make the safety checks clear", "Plan the rollout"],
   },
 ] as const;
 
@@ -37,7 +37,7 @@ export function ReadinessPanel() {
         <span>Choose your starting point</span>
       </div>
       <h2 id="readiness-title" className="font-display text-h3 font-semibold">
-        Make the path fit the work.
+        Choose the path that fits you.
       </h2>
       <div className="segmented-control" aria-label="Select your starting point">
         {startingPoints.map((item) => (
@@ -65,7 +65,7 @@ export function ReadinessPanel() {
           ))}
         </ul>
       </div>
-      <p className="panel-note">Illustrative guidance, not an automated recommendation.</p>
+      <p className="panel-note">A guide only, not an automatic recommendation.</p>
     </aside>
   );
 }

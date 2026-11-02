@@ -15,9 +15,9 @@ type Plan = {
 const MAX_LENGTH = 600;
 
 const workflowStarters = [
-  ["Lead handoff", "Lead", "A high-intent website lead needs to be qualified and routed to the right sales owner without losing context."],
-  ["Invoice approval", "Invoice", "Invoices over an agreed threshold need the correct approval before their due date."],
-  ["Policy search", "Policy", "Team members need grounded answers from approved internal policies, with unclear cases sent to an owner."],
+  ["New enquiries", "Leads", "A new website enquiry from someone ready to buy needs to reach the right salesperson quickly, with all the details."],
+  ["Invoice approval", "Invoice", "Invoices over an agreed amount need the right person to approve them before they are due."],
+  ["Policy questions", "Policy", "Staff need clear answers from our approved policies, and anything unclear should go to the person who owns that policy."],
 ] as const;
 
 export function AgentBuilder() {
@@ -31,7 +31,7 @@ export function AgentBuilder() {
     setError("");
 
     if (workflow.trim().length < 5) {
-      setError("Describe the workflow in a sentence or two first.");
+      setError("Describe the task in a sentence or two first.");
       return;
     }
 
@@ -66,10 +66,10 @@ export function AgentBuilder() {
 
   return (
     <div className="rounded-feature border border-stone-100 bg-paper p-4 sm:p-7" aria-live="polite">
-      <p className="font-mono text-overline uppercase text-terracotta">Workflow Blueprint Preview</p>
-      <p className="mt-3 hidden text-h3 font-semibold sm:block">Turn one repeated process into a reviewable starting point.</p>
+      <p className="font-mono text-overline uppercase text-terracotta">Agent plan preview</p>
+      <p className="mt-3 hidden text-h3 font-semibold sm:block">Turn one repeat task into a simple starting plan.</p>
       <p className="mt-3 rounded-card bg-stone-50 p-3 text-label text-stone-600">
-        Generic examples only: no customer data, credentials, health information, or confidential details.
+        Please use general examples only: no customer details, passwords, health information or anything confidential.
       </p>
 
       <div className="mt-5" role="group" aria-label="Safe workflow starting points">
@@ -94,12 +94,12 @@ export function AgentBuilder() {
       </div>
 
       <form onSubmit={handleSubmit} className="mt-5">
-        <label htmlFor="workflow" className="text-label font-semibold">Describe a business workflow</label>
+        <label htmlFor="workflow" className="text-label font-semibold">Describe a task your team repeats</label>
         <textarea
           id="workflow"
           value={workflow}
           onChange={(e) => setWorkflow(e.target.value.slice(0, MAX_LENGTH))}
-          placeholder="e.g. Invoices over a threshold need approval, but nobody notices until they're overdue"
+          placeholder="e.g. Big invoices need approval, but nobody notices until they are overdue"
           rows={3}
           maxLength={MAX_LENGTH}
           className="mt-2 w-full resize-none rounded-control border border-stone-100 p-3 text-label focus:border-terracotta focus:outline-none focus:ring-1 focus:ring-terracotta"
@@ -133,31 +133,31 @@ export function AgentBuilder() {
           </p>
           <p className="mt-2 text-ink font-semibold">{plan.summary}</p>
 
-          <p className="mt-4 font-semibold">Likely inputs</p>
+          <p className="mt-4 font-semibold">What the agent needs</p>
           <ul className="mt-1 space-y-1 text-stone-600">
             {plan.likelyInputs.map((i) => (
               <li key={i}>· {i}</li>
             ))}
           </ul>
 
-          <p className="mt-4 font-semibold">Proposed stages</p>
+          <p className="mt-4 font-semibold">Steps</p>
           <ol className="mt-1 space-y-1 text-stone-600">
             {plan.proposedStages.map((s, idx) => (
               <li key={s}>{idx + 1}. {s}</li>
             ))}
           </ol>
 
-          <p className="mt-4 font-semibold">Human review point</p>
+          <p className="mt-4 font-semibold">Where a person checks</p>
           <p className="text-stone-600">{plan.humanReviewPoint}</p>
 
-          <p className="mt-4 font-semibold">Questions Akrithos would clarify</p>
+          <p className="mt-4 font-semibold">Questions we would ask you</p>
           <ul className="mt-1 space-y-1 text-stone-600">
             {plan.clarifyingQuestions.map((q) => (
               <li key={q}>· {q}</li>
             ))}
           </ul>
 
-          <p className="mt-4 text-terracotta">→ For the Diagnostic: {plan.diagnosticFocus}</p>
+          <p className="mt-4 text-terracotta">→ To look at in the Diagnostic: {plan.diagnosticFocus}</p>
         </div>
       )}
     </div>

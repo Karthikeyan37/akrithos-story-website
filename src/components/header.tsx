@@ -7,9 +7,9 @@ import { useBooking } from "@/components/booking-provider";
 import { integrations } from "@/config/integrations";
 
 const navItems = [
-  { label: "Agents", href: "#platform" },
   { label: "Agent Quest", href: "#quest" },
-  { label: "Blueprint", href: "#live-agent" },
+  { label: "Agents", href: "#platform" },
+  { label: "Planner", href: "#live-agent" },
   { label: "Security", href: "#security" },
   { label: "Training", href: "#live-program" },
   { label: "Team", href: "#team" },

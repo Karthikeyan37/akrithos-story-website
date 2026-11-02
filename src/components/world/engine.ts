@@ -42,11 +42,14 @@ const COLORS = {
   stone: new THREE.Color("#A8A396"),
 };
 
+/** Everything that drifts moves at under half its original speed: visitor feedback found the fast dots distracting. */
+const CALM = 0.42;
+
 /** Where each chapter puts the camera and how far each effect has gone. */
 type Beat = { pos: [number, number, number]; look: [number, number, number]; agit: number; order: number; boundary: number; gate: number; flow: number; glow: number };
 const BEATS: Beat[] = [
   { pos: [-0.6, 0.9, 10.5], look: [-2.6, 0.3, 0], agit: 0.35, order: 0.12, boundary: 0, gate: 0, flow: 0, glow: 0.75 },
-  { pos: [0.4, 1.6, 12.5], look: [-2.4, 0, 0], agit: 1, order: 0, boundary: 0, gate: 0, flow: 0, glow: 0.35 },
+  { pos: [0.4, 1.6, 12.5], look: [-2.4, 0, 0], agit: 0.55, order: 0, boundary: 0, gate: 0, flow: 0, glow: 0.35 },
   { pos: [1.4, 3.2, 10.2], look: [3.3, 0.1, 0], agit: 0.15, order: 1, boundary: 0, gate: 0, flow: 0, glow: 0.8 },
   { pos: [-0.5, 4.6, 17.5], look: [-4.2, 0, 0], agit: 0.1, order: 1, boundary: 1, gate: 0, flow: 0, glow: 0.7 },
   { pos: [1.0, 1.0, 15.5], look: [-1.2, 0.1, 0], agit: 0.05, order: 0.45, boundary: 0.35, gate: 1, flow: 1, glow: 0.8 },
@@ -83,7 +86,7 @@ const PARTICLE_VERTEX = /* glsl */ `
     float ph = acos(2.0 * aSeed.z - 1.0);
     float rad = 4.2 + aSeed.x * 4.8;
     vec3 chaos = vec3(sin(ph) * cos(th), cos(ph) * 0.62, sin(ph) * sin(th)) * rad;
-    chaos += vec3(sin(uTime * 1.7 + aSeed.w * 40.0), cos(uTime * 1.3 + aSeed.x * 30.0), sin(uTime * 1.1 + aSeed.y * 20.0)) * (0.15 + 0.65 * uAgit);
+    chaos += vec3(sin(uTime * 0.6 + aSeed.w * 40.0), cos(uTime * 0.5 + aSeed.x * 30.0), sin(uTime * 0.4 + aSeed.y * 20.0)) * (0.06 + 0.24 * uAgit);
 
     // Sorted work: riding one of the four agent orbits.
     float r = pick(uRingR, aRing), tilt = pick(uRingTilt, aRing), yaw = pick(uRingYaw, aRing), sp = pick(uRingSpeed, aRing);
@@ -218,7 +221,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
   scene.add(ringGroup);
 
   // Work: one particle per piece of work.
-  const N = opts.lite ? 900 : 2600;
+  const N = opts.lite ? 600 : 1600;
   const geo = new THREE.BufferGeometry();
   const seed = new Float32Array(N * 4), ringIdx = new Float32Array(N), phase = new Float32Array(N), laneA = new Float32Array(N);
   for (let i = 0; i < N; i++) {
@@ -334,7 +337,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
     camera.position.copy(camPos);
     camera.lookAt(camLook);
 
-    uniforms.uTime.value = t;
+    uniforms.uTime.value = t * CALM;
     uniforms.uAgit.value = current.agit;
     uniforms.uOrder.value = current.order;
     uniforms.uFlow.value = current.flow;
@@ -342,7 +345,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
     ringMats.forEach((m, i) => { m.opacity = current.order * (focus === i ? 0.75 : 0.28); });
     nodes.forEach((n, i) => {
       const ring = RINGS[i];
-      const a = t * ring.speed + i * 1.7;
+      const a = t * CALM * ring.speed + i * 1.7;
       n.position.set(Math.cos(a) * ring.r, 0, Math.sin(a) * ring.r);
       (n.material as THREE.MeshBasicMaterial).opacity = current.order;
       ((n.children[0] as THREE.Sprite).material as THREE.SpriteMaterial).opacity = current.order * (focus === i ? 1 : 0.65);
@@ -352,7 +355,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
     shell.rotation.y = t * 0.03;
     shell.scale.setScalar(1.35 - 0.35 * current.boundary);
     gateMat.opacity = current.gate;
-    gateMat.emissiveIntensity = current.gate * (1.4 + 0.4 * Math.sin(t * 2.2));
+    gateMat.emissiveIntensity = current.gate * (1.4 + 0.3 * Math.sin(t * 1.1));
     (gateGlow.material as THREE.SpriteMaterial).opacity = current.gate * 0.55;
 
     // A gentle sway (never edge-on), so the mark always reads.
