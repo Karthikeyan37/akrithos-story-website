@@ -16,14 +16,10 @@
  *   5  "The pile is gone": the desk is clear and the agent settles on it beside the person, who smiles.
  *
  * Everything is in one 3D space, so paper passes behind the pile and lands with shadows. Built in code (plus six small
- * cut-outs), so it loads fast. Phones get the light version (no shadows or glow); reduced motion gets still frames;
+ * cut-outs), so it loads fast. Phones get the light version (no shadows); reduced motion gets still frames;
  * computers without a graphics card, and a failed WebGL context, keep the poster.
  */
 import * as THREE from "three";
-import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
-import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
-import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
-import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { createOffice, paperTexture } from "./office";
 import { createHelper, glowMaterial } from "./helper";
@@ -70,8 +66,8 @@ const STACKS = [-0.12, 0.13, 0.38, 0.63].map((x) => new THREE.Vector3(x, DESK.y,
 const DOOR = new THREE.Vector3(-0.78, 1.25, -2.9);
 const PILE_H = 1.15; // a full pile towers over the seated person
 const CARD = { w: 0.24, d: 0.31 };
-/** The person cut-out: where it stands (between the chair and the desk, so the desk hides what is below its top) and its size. */
-const PERSON = { at: new THREE.Vector3(-0.4, 1.07, -0.42), w: 0.72, h: 0.89 };
+/** The person cut-out: where it stands (just over the back of the desk, so their arms rest on it and the soft bottom of the cut-out melts onto the wood) and its size. */
+const PERSON = { at: new THREE.Vector3(-0.4, 1.113, -0.3), w: 0.72, h: 0.976 };
 
 /**
  * The camera for each step: always the artwork's angle (high, front left), moving only a little, so the room stays
@@ -177,18 +173,13 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
   const faces = opts.people.map((src) => { const t = loader.load(src, () => still()); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; });
   const personGeo = new THREE.PlaneGeometry(PERSON.w, PERSON.h);
   const layer = () => {
-    const m = new THREE.Mesh(personGeo, new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.02, depthWrite: false, toneMapped: false, color: new THREE.Color(0.92, 0.9, 0.88) }));
+    // Given an image from the start, so its shader never changes later (a change would rebuild it mid-story).
+    const m = new THREE.Mesh(personGeo, new THREE.MeshBasicMaterial({ map: faces[0], transparent: true, alphaTest: 0.01, depthWrite: false, toneMapped: false, color: new THREE.Color(0.92, 0.9, 0.88) }));
     m.position.copy(PERSON.at);
     m.renderOrder = 1;
     scene.add(m);
     return m;
   };
-  // A soft shadow just behind the person, so they sit in the room rather than on top of it.
-  const shadeTex = glowTexture("rgba(0,0,0,0.55)");
-  const shade = new THREE.Mesh(new THREE.PlaneGeometry(PERSON.w * 1.15, PERSON.h * 1.05), new THREE.MeshBasicMaterial({ map: shadeTex, transparent: true, depthWrite: false }));
-  shade.position.copy(PERSON.at).add(new THREE.Vector3(0.02, -0.03, -0.08));
-  shade.renderOrder = 0;
-  scene.add(shade);
   const faceBack = layer(), faceFront = layer();
   faceFront.renderOrder = 2;
   let shownFace = -1, faceFade = 1;
@@ -251,20 +242,15 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
   focusRing.rotation.x = -Math.PI / 2;
   scene.add(focusRing);
 
-  let composer: EffectComposer | null = null;
-  if (!opts.lite) {
-    composer = new EffectComposer(renderer);
-    composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.3, 0.5, 0.92));
-    composer.addPass(new OutputPass());
-  }
+  // No glow pass (bloom): drawn as a second step over the scene, it left some frames empty, so the scene blinked off
+  // and on. The scene is drawn in one step instead; the warm light comes from the lights themselves.
 
   // ---- state ----
   let targetP = 0, p = 0;
   const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
   let focus = -1;
   let active = true, destroyed = false, raf = 0, started = false;
-  let t = 0, last = performance.now(), frames = 0, acc = 0, fps = 60;
+  let t = 0, last = performance.now(), frames = 0, acc = 0, fps = 60, warmedUp = false;
   let width = 1, height = 1;
   const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), agentPos = new THREE.Vector3();
   const tPos = new THREE.Vector3(), tQuat = new THREE.Quaternion(), tColor = new THREE.Color(), euler = new THREE.Euler(), matrix = new THREE.Matrix4(), one = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0);
@@ -282,7 +268,6 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
     width = canvas.clientWidth || window.innerWidth;
     height = canvas.clientHeight || window.innerHeight;
     renderer.setSize(width, height, false);
-    composer?.setSize(width, height);
     camera.aspect = width / height;
     // Wide screens: shift the picture right so the scene sits beside the copy, not under it.
     const shift = camera.aspect > 1.2 ? Math.round(width * 0.17) : 0;
@@ -296,7 +281,13 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
     window.clearTimeout(stillTimer);
     stillTimer = window.setTimeout(() => { if (active && !destroyed) draw(0); }, 120);
   };
-  const onResize = () => { resize(); still(); };
+  // Resizing wipes the canvas: draw again straight away, so the scene never blanks for a frame (phones resize the
+  // page each time the browser bar slides in or out).
+  const onResize = () => {
+    resize();
+    if (started && active && !opts.reduced && !destroyed) draw(0);
+    else still();
+  };
   window.addEventListener("resize", onResize);
   resize();
 
@@ -344,17 +335,16 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
 
     // The person: the step's cut-out, facing the camera, dissolving in over the last in half a second.
     if (step0 !== shownFace) {
+      // Swapping one image for another keeps the same shader, so no rebuild is needed.
       (faceBack.material as THREE.MeshBasicMaterial).map = shownFace >= 0 ? faces[shownFace] : faces[step0];
-      (faceBack.material as THREE.MeshBasicMaterial).needsUpdate = true;
       (faceFront.material as THREE.MeshBasicMaterial).map = faces[step0];
-      (faceFront.material as THREE.MeshBasicMaterial).needsUpdate = true;
       faceFade = shownFace < 0 || opts.reduced ? 1 : 0;
       shownFace = step0;
     }
     faceFade = Math.min(1, faceFade + dt / 0.5);
     (faceFront.material as THREE.MeshBasicMaterial).opacity = faceFade;
     faceBack.visible = faceFade < 1;
-    [faceBack, faceFront, shade].forEach((m) => m.quaternion.copy(camera.quaternion));
+    [faceBack, faceFront].forEach((m) => m.quaternion.copy(camera.quaternion));
 
     // The agent: pops up, waves hello, then goes where the work is.
     agentAt(p, agentPos);
@@ -472,7 +462,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
 
   function draw(dt: number) {
     step(dt);
-    if (composer) composer.render(); else renderer.render(scene, camera);
+    renderer.render(scene, camera);
   }
 
   function loop(now: number) {
@@ -482,14 +472,17 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
     last = now;
     if (!document.hidden && active) {
       t += dt;
-      draw(dt);
-      // Adaptive quality: if 90 frames run under ~40 fps, render fewer pixels.
+      // Adaptive quality: if 90 frames run under ~40 fps, render fewer pixels. Changing the size wipes the canvas, so
+      // it happens before this frame is drawn (never between a frame and the screen), and skips the first second,
+      // while the browser is still busy starting up.
       acc += dt; frames++;
       if (frames === 90) {
         fps = frames / acc;
-        if (fps < 40 && dpr > 1) { dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); resize(); }
+        if (warmedUp && fps < 40 && dpr > 1) { dpr = Math.max(1, dpr - 0.25); renderer.setPixelRatio(dpr); resize(); }
+        warmedUp = true;
         frames = 0; acc = 0;
       }
+      draw(dt);
     }
     if (!opts.reduced) raf = requestAnimationFrame(loop);
   }
@@ -524,14 +517,18 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
       faces.forEach((f) => f.dispose());
       envTex.dispose();
       pmrem.dispose();
-      composer?.dispose();
       renderer.dispose();
     },
   };
 
   // Prepare every shader in the background first (doing it in one go would freeze the page), then draw the first
   // frame (also the only kind of frame under reduced motion).
+  // Everything is made visible while preparing, so nothing hidden at the start (the agent, the ticks in the logbook,
+  // the second face layer) has to be prepared later, mid-story, which would make the room blink.
+  const hidden: THREE.Object3D[] = [];
+  scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
   renderer.compileAsync(scene, camera).catch(() => undefined).then(() => {
+    hidden.forEach((o) => { o.visible = false; });
     if (destroyed) return;
     started = true;
     draw(0.016);

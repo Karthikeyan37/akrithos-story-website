@@ -101,7 +101,9 @@ export function createHelper(size = 0.085) {
      * (world position, usually the camera); t: time in seconds.
      */
     update(presence: number, wave: number, busy: number, face: THREE.Vector3, t: number) {
-      group.visible = presence > 0.01;
+      // Only the body hides: its light stays in the scene (at zero), because adding or removing a light makes every
+      // surface in the room rebuild its shader, and the room vanishes for a frame while that happens.
+      bot.visible = presence > 0.01;
       // Pops in with a small bounce.
       const pop = presence < 1 ? presence * (1 + 0.25 * Math.sin(presence * Math.PI)) : 1;
       bot.scale.setScalar(size * Math.max(0.001, pop));

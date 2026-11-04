@@ -63,7 +63,7 @@ export function WorldStage() {
     const software = /swiftshader|llvmpipe|software|basic render/i.test(String(info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : ""));
     gl.getExtension("WEBGL_lose_context")?.loseContext();
     if (software) { queueMicrotask(() => setState("failed")); return; }
-    // Phones and touch screens get the light version (no shadows or glow).
+    // Phones and touch screens get the light version (no shadows).
     const lite = window.matchMedia("(max-width: 768px), (hover: none)").matches;
 
     const progress = () => storyProgress(storyChapters());

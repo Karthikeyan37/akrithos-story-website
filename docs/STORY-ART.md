@@ -73,6 +73,12 @@ Tell me they are in `public/story/`. I will compress them, switch the story to t
 
 ## The person in the 3D story
 
-The home page story is a live 3D office staged like these images. The person in it is cut out of each step's image (with their chair), so their real face and mood show at every step. After changing any step image, run `node scripts/cut-person.mjs` to make the cut-outs again (`public/story/person-1.webp` to `person-6.webp`). The outlines in that script follow the person in the current images; a new image with the person in a different place needs its outline traced again.
+The home page story is a live 3D office staged like these images. The person in it is cut out of each step's image (with their chair), so their real face and mood show at every step: `public/story/person-1.webp` to `person-6.webp`, made by `node scripts/cut-person.mjs`.
 
-Sharper cut-outs come from sharper images: a 2x upscale of the step images (2048 px wide or more) makes the person crisp on large screens.
+The exact edge of the hair, face and shoulders comes from masks made with **rembg** (an open-source background-removal tool, MIT licence), saved in `scripts/person-mattes/`. They only need making again when a step image changes:
+
+1. Install rembg once, outside the project: `python3 -m venv ~/rembg && ~/rembg/bin/pip install "rembg[cpu]"`.
+2. For each changed image, crop the region x 532 to 700, y 160 to 388, enlarge it 4x, and run rembg with the model `isnet-general-use` (saved as `person-N.png`) and with `u2net_human_seg` (saved as `chair-N.png`, which keeps the chair).
+3. Run `node scripts/cut-person.mjs`.
+
+If the person sits somewhere else in a new image, the region and the traced outlines in the script need moving too. Sharper images (2048 px wide or more) give a crisper person on large screens.

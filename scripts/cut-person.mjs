@@ -1,8 +1,12 @@
 /**
  * Cuts the person (with their chair) out of each story image, for the 3D story (src/components/world/engine.ts).
- * Outlines were traced on a 3x zoom of the region x 500..730, y 130..430 of the 1017 × 572 images ("grid" units);
- * the cut-outs cover x 532..700, y 180..388 and are saved at twice that size with soft edges (and a soft fade at the
- * bottom, where the desk meets them), as WebP with transparency.
+ *
+ * The exact edge comes from masks made by a background-removal model (rembg, MIT licence), kept in
+ * scripts/person-mattes/: `person-N.png` (isnet-general-use: clean hair, face and shoulders) and `chair-N.png`
+ * (u2net_human_seg: also keeps the chair). They were made from the region x 532..700, y 160..388 of each 1017 × 572
+ * image, enlarged 4x. The outlines below were traced on a 3x zoom of the region x 500..730, y 130..430 ("grid" units);
+ * they only keep the desk, the pile and the mug out. The edge takes its colour from the person, not from the wall
+ * behind, so there is no dark outline; the right side and the bottom fade softly (rounded corners, no straight line).
  * Run: node scripts/cut-person.mjs
  */
 import sharp from "sharp";
@@ -16,27 +20,60 @@ const OUTLINES = {
   5: [...CHAIR, [345, 338], [330, 250], [345, 175], [420, 135], [500, 135], [530, 170], [538, 230], [538, 335], [560, 420], [610, 460], [690, 500], [690, 580], [600, 610], [632, 700], [630, 745], [560, 742], [465, 742], [455, 752], [270, 770], [150, 756], [118, 705]],
   6: [...CHAIR, [345, 338], [330, 250], [350, 170], [420, 130], [500, 130], [540, 180], [550, 250], [552, 330], [540, 400], [565, 425], [598, 445], ...BOTTOM],
 };
-const REGION = { left: 532, top: 180, width: 168, height: 208 };
+const REGION = { left: 532, top: 160, width: 168, height: 228 };
 const SCALE = 2;
 // Grid units to cut-out pixels.
 const px = ([gx, gy]) => [((500 + gx / 3 - REGION.left) * SCALE).toFixed(1), ((130 + gy / 3 - REGION.top) * SCALE).toFixed(1)];
-
 const SOURCES = { 1: 1, 2: 1, 3: 3, 4: 4, 5: 5, 6: 6 };
+const w = REGION.width * SCALE, h = REGION.height * SCALE, n = w * h;
+const clamp = (x) => Math.max(0, Math.min(1, x));
+const blur3 = async (buf, sigma) => sharp(buf, { raw: { width: w, height: h, channels: 3 } }).blur(sigma).raw().toBuffer();
+const shape = async (pts, sigma) => sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><polygon points="${pts.map((p) => px(p).join(",")).join(" ")}" fill="#fff"/></svg>`)).blur(sigma).toColourspace("b-w").extractChannel(0).raw().toBuffer();
+const matte = async (file) => sharp(file).extractChannel(0).resize(w, h, { kernel: "lanczos3" }).raw().toBuffer();
+// The chair's back, to the left of the person: the only part taken from the second mask.
+const CHAIR_ZONE = [[96, 436], [300, 340], [322, 400], [290, 560], [250, 775], [150, 768], [105, 708]];
+
 for (const [step, src] of Object.entries(SOURCES)) {
-  const w = REGION.width * SCALE, h = REGION.height * SCALE;
-  const points = OUTLINES[src].map((p) => px(p).join(",")).join(" ");
-  // The outline, fading out over the bottom (where the desk meets it) and the right side (where the image's own pile
-  // cut the person off), so it melts into the scene instead of ending on a hard line.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><defs><linearGradient id="f" x1="0" y1="0" x2="0" y2="1"><stop offset="0.78" stop-color="#fff"/><stop offset="0.97" stop-color="#000"/></linearGradient><linearGradient id="r" x1="0" y1="0" x2="1" y2="0"><stop offset="${src === "5" ? 0.95 : 0.84}" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient><mask id="m"><rect width="${w}" height="${h}" fill="url(#f)"/></mask><mask id="n"><rect width="${w}" height="${h}" fill="url(#r)"/></mask></defs><g mask="url(#n)"><polygon points="${points}" fill="#fff" mask="url(#m)"/></g></svg>`;
-  // Soft edges, pulled slightly inside the outline so none of the wall behind shows around the person.
-  const soft = await sharp(Buffer.from(svg)).blur(3).toColourspace("b-w").png().toBuffer();
-  const mask = await sharp(soft).linear(1.8, -0.55 * 255).png().toBuffer();
-  await sharp(`public/story/step-${src}.webp`)
-    .extract(REGION)
-    .resize(w, h, { kernel: "lanczos3" })
-    .ensureAlpha()
-    .composite([{ input: mask, blend: "dest-in" }])
-    .webp({ quality: 88, alphaQuality: 90 })
-    .toFile(`public/story/person-${step}.webp`);
+  const [person, chairMatte, bound, chairZone] = await Promise.all([
+    matte(`scripts/person-mattes/person-${src}.png`),
+    matte(`scripts/person-mattes/chair-${src}.png`),
+    shape(OUTLINES[src], 6), // the traced outline, softened: keeps the desk, pile and mug out
+    shape(CHAIR_ZONE, 3),
+  ]);
+  const image = await sharp(`public/story/step-${src}.webp`).extract(REGION).resize(w, h, { kernel: "lanczos3" }).removeAlpha().raw().toBuffer();
+
+  // How solid each pixel is: the person, plus the chair, inside the outline, with the soft fade on the right and bottom.
+  const a = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i % w) / w, y = Math.floor(i / w) / h;
+    const d = Math.pow(Math.pow(Math.abs(x - 0.45) / 0.55, 4) + Math.pow(Math.max(0, y - 0.45) / 0.5, 4), 0.25);
+    const f = 1 - clamp((d - 0.86) / 0.13);
+    const fade = f * f * (3 - 2 * f);
+    // Faint, unsure parts of the masks (bits of the paper pile, glints on the wall) are dropped; the edges stay soft.
+    const sure = (v) => clamp((v / 255 - 0.3) / 0.45);
+    const body = Math.max(sure(person[i]), sure(chairMatte[i]) * (chairZone[i] / 255));
+    a[i] = body * clamp((bound[i] / 255 - 0.2) / 0.5) * fade;
+  }
+
+  // Clean edge colours: where the person is surely solid, keep their colours; at the soft edge, borrow the nearest
+  // solid colours (hair, skin, suit, chair) instead of the dark wall that was behind them.
+  const prem = Buffer.alloc(n * 3), weight = Buffer.alloc(n * 3), own = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const k = clamp((a[i] - 0.7) / 0.25);
+    own[i] = k;
+    for (let c = 0; c < 3; c++) { prem[i * 3 + c] = Math.round(image[i * 3 + c] * k); weight[i * 3 + c] = Math.round(k * 255); }
+  }
+  const [premB, weightB, premF, weightF] = await Promise.all([blur3(prem, 4), blur3(weight, 4), blur3(prem, 14), blur3(weight, 14)]);
+  const out = Buffer.alloc(n * 4);
+  for (let i = 0; i < n; i++) {
+    const k = own[i], near = weightB[i * 3], far = weightF[i * 3];
+    for (let c = 0; c < 3; c++) {
+      const self = image[i * 3 + c];
+      const bled = near > 10 ? Math.min(255, (premB[i * 3 + c] / near) * 255) : far > 1 ? Math.min(255, (premF[i * 3 + c] / far) * 255) : self;
+      out[i * 4 + c] = Math.round(self * k + bled * (1 - k));
+    }
+    out[i * 4 + 3] = Math.round(a[i] * 255);
+  }
+  await sharp(out, { raw: { width: w, height: h, channels: 4 } }).webp({ quality: 90, alphaQuality: 95 }).toFile(`public/story/person-${step}.webp`);
   console.log(`person-${step}.webp`);
 }
