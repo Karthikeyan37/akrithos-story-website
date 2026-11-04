@@ -1,15 +1,23 @@
 /**
- * The Akrithos work engine: one WebGL scene behind the opening story.
+ * The Akrithos work engine: one WebGL scene behind the opening story, staged like the story artwork (a dark office seen
+ * from high at the front left: the open door behind, the desk with its tall pile, the inbox box at the far end). The
+ * person is the real one from the artwork, cut out of each step's image (scripts/cut-person.mjs), so their face shows
+ * how they feel. Each step acts out exactly what its words say (scroll drives `setProgress(0..5)`):
+ *   0  "Calls, emails, forms and bills land on your team's desk": work flies in through the door onto the pile.
+ *   1  "Things start to slip: a missed call, a late bill": more arrives, the desk phone lights up unanswered, and a few
+ *      sheets slide off onto the floor.
+ *   2  "An agent picks up each piece of work, sorts it... Nothing gets lost. There are four kinds": a small, friendly
+ *      agent pops up beside the person and waves; it flies to the pile, reads it, and lifts every sheet (the ones on
+ *      the floor too) into four neat stacks, one per kind of agent.
+ *   3  "Your information stays inside... every step is written down": the agent flies to the open door, closes it and
+ *      a padlock lights up on it; a soft shield forms over the desk; the logbook on the desk fills, line by line.
+ *   4  "Most jobs are finished for you. The few that need a decision go to a person": the stacks are filed into the
+ *      inbox box (Done) and the agent brings the person the three that need a yes or no.
+ *   5  "The pile is gone": the desk is clear and the agent settles on it beside the person, who smiles.
  *
- * What it shows, chapter by chapter (scroll drives `setProgress(0..4)`):
- *   0  The Akrithos peak (the mark from the logo) glowing at the centre, work drifting around it.
- *   1  Work arrives from everywhere: requests, invoices, calls, questions, swirling and unsorted.
- *   2  Agents take the repeat work: the swirl settles into four orbits, one per kind of agent.
- *   3  Inside your boundary: a shell closes around the system; nothing leaves it.
- *   4  Your people decide: finished work streams out through a gate a person holds, and only then turns to outcome.
- *
- * Built in code (no downloaded models or video), so it loads fast and every light is in the brand's colours.
- * Phones get fewer particles and no bloom; reduced motion gets still frames; a failed WebGL context leaves the poster.
+ * Everything is in one 3D space, so paper passes behind the pile and lands with shadows. Built in code (plus six small
+ * cut-outs), so it loads fast. Phones get the light version (no shadows or glow); reduced motion gets still frames;
+ * computers without a graphics card, and a failed WebGL context, keep the poster.
  */
 import * as THREE from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
@@ -17,12 +25,16 @@ import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { createOffice, paperTexture } from "./office";
+import { createHelper, glowMaterial } from "./helper";
 
 export type WorldOptions = {
   lite: boolean;
   reduced: boolean;
-  /** Called once per frame with each agent node's screen position, then the gate's (for the HTML labels). */
-  onLabels?: (labels: Array<{ x: number; y: number; visible: boolean }>) => void;
+  /** The person cut out of each step's image, in step order. */
+  people: string[];
+  /** Called once the first frame is on screen. */
+  onReady?: () => void;
 };
 
 export type World = {
@@ -35,124 +47,78 @@ export type World = {
 };
 
 const COLORS = {
-  bg: new THREE.Color("#0C0E11"),
-  ember: new THREE.Color("#E8714A"),
-  terracotta: new THREE.Color("#BE4C33"),
+  bg: new THREE.Color("#0B0B0C"),
   gold: new THREE.Color("#D4A35F"),
-  stone: new THREE.Color("#A8A396"),
+  focus: new THREE.Color("#FFC9A0"),
+  missed: new THREE.Color("#D9A88F"),
+  check: new THREE.Color("#F0B08E"),
 };
+const PAPER = ["#E4E0D8", "#DCD6CB", "#E8E4DC", "#D6CFC2"].map((c) => new THREE.Color(c));
+/** One soft tint per kind of work, so the four sorted stacks read as four kinds. */
+const KINDS = ["#E9D9C2", "#D9E0E4", "#E6DCCB", "#DCE3D5"].map((c) => new THREE.Color(c));
 
-/** Everything that drifts moves at under half its original speed: visitor feedback found the fast dots distracting. */
+/** Everything moves at under half speed: visitor feedback found fast motion distracting. */
 const CALM = 0.42;
 
-/** Where each chapter puts the camera and how far each effect has gone. */
-type Beat = { pos: [number, number, number]; look: [number, number, number]; agit: number; order: number; boundary: number; gate: number; flow: number; glow: number };
+// The room, in metres with the floor at 0.
+const DESK = new THREE.Vector3(0.1, 0.76, 0); // centre of the desk top
+const PILE = new THREE.Vector3(0.36, DESK.y, 0.02);
+const BOX = new THREE.Vector3(0.82, DESK.y, -0.06);
+const CHECK = new THREE.Vector3(-0.3, DESK.y, -0.06); // in front of the person, for the few they check
+/** The four sorted stacks, one per kind of agent, in a row along the front of the desk. */
+const STACKS = [-0.12, 0.13, 0.38, 0.63].map((x) => new THREE.Vector3(x, DESK.y, 0.33));
+const DOOR = new THREE.Vector3(-0.78, 1.25, -2.9);
+const PILE_H = 1.15; // a full pile towers over the seated person
+const CARD = { w: 0.24, d: 0.31 };
+/** The person cut-out: where it stands (between the chair and the desk, so the desk hides what is below its top) and its size. */
+const PERSON = { at: new THREE.Vector3(-0.4, 1.07, -0.42), w: 0.72, h: 0.89 };
+
+/**
+ * The camera for each step: always the artwork's angle (high, front left), moving only a little, so the room stays
+ * put and the story happens in it. On wide screens the scene sits to the right of the copy.
+ */
+type Beat = { pos: [number, number, number]; look: [number, number, number]; fov: number };
 const BEATS: Beat[] = [
-  { pos: [-0.6, 0.9, 10.5], look: [-2.6, 0.3, 0], agit: 0.35, order: 0.12, boundary: 0, gate: 0, flow: 0, glow: 0.75 },
-  { pos: [0.4, 1.6, 12.5], look: [-2.4, 0, 0], agit: 0.55, order: 0, boundary: 0, gate: 0, flow: 0, glow: 0.35 },
-  { pos: [1.4, 3.2, 10.2], look: [3.3, 0.1, 0], agit: 0.15, order: 1, boundary: 0, gate: 0, flow: 0, glow: 0.8 },
-  { pos: [-0.5, 4.6, 17.5], look: [-4.2, 0, 0], agit: 0.1, order: 1, boundary: 1, gate: 0, flow: 0, glow: 0.7 },
-  { pos: [1.0, 1.0, 15.5], look: [-1.2, 0.1, 0], agit: 0.05, order: 0.45, boundary: 0.35, gate: 1, flow: 1, glow: 0.8 },
+  { pos: [-2.55, 2.95, 3.35], look: [0.15, 1.0, -0.4], fov: 32 },
+  { pos: [-2.7, 2.95, 3.55], look: [-0.05, 0.85, -0.2], fov: 33 },
+  { pos: [-2.5, 2.9, 3.35], look: [0.1, 1.05, -0.2], fov: 32 },
+  { pos: [-2.95, 3.35, 3.95], look: [0.1, 1.05, -0.4], fov: 35 },
+  { pos: [-2.35, 2.75, 3.1], look: [0.05, 0.95, -0.25], fov: 32 },
+  { pos: [-2.45, 2.85, 3.25], look: [0.0, 1.0, -0.35], fov: 32 },
 ];
 
-/** The four agent orbits (radius, tilt, yaw, speed), matching the four systems in the showcase. */
-const RINGS = [
-  { r: 2.1, tilt: 1.18, yaw: 0.2, speed: 0.42 },
-  { r: 2.65, tilt: 1.42, yaw: 1.3, speed: -0.33 },
-  { r: 3.2, tilt: 1.05, yaw: 2.4, speed: 0.27 },
-  { r: 3.75, tilt: 1.62, yaw: -0.7, speed: -0.22 },
+/**
+ * Where the agent is through the story: it pops up beside the person, works above the pile, holds the middle of the
+ * shield, brings the person the few to check, then settles on the desk. Positions blend between these points.
+ */
+const AGENT_PATH: Array<{ p: number; at: [number, number, number] }> = [
+  { p: 1.05, at: [-0.1, 1.25, -0.3] }, // pops up beside the person and waves
+  { p: 1.38, at: [-0.1, 1.25, -0.3] },
+  { p: 1.5, at: [0.36, 2.0, 0.05] }, // over the pile, sorting it
+  { p: 1.95, at: [0.3, 1.2, 0.2] },
+  { p: 2.25, at: [-0.5, 1.3, -2.2] }, // to the open door, which it closes and locks
+  { p: 2.8, at: [-0.5, 1.3, -2.2] },
+  { p: 3.05, at: [0.25, 1.5, 0.0] }, // back in the middle of the shield
+  { p: 3.2, at: [0.25, 1.5, 0.0] },
+  { p: 3.5, at: [-0.1, 1.02, 0.05] }, // bringing the person the few to check
+  { p: 4.3, at: [-0.1, 1.02, 0.05] },
+  { p: 4.85, at: [0.12, DESK.y + 0.1, 0.14] }, // settled on the desk beside them
 ];
-const GATE_X = 3.2;
 
-const PARTICLE_VERTEX = /* glsl */ `
-  attribute vec4 aSeed;
-  attribute float aRing;
-  attribute float aPhase;
-  attribute float aLane;
-  uniform float uTime, uAgit, uOrder, uFlow, uSize, uFocus;
-  uniform vec4 uRingR, uRingTilt, uRingYaw, uRingSpeed;
-  uniform float uGateX;
-  varying vec3 vColor;
-  varying float vAlpha;
-  uniform vec3 uChaos, uOrdered, uOut, uFocusColor;
+const clamp01 = (x: number) => Math.max(0, Math.min(1, x));
+const smooth = (a: number, b: number, x: number) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
 
-  mat3 rotX(float a) { float c = cos(a), s = sin(a); return mat3(1.0, 0.0, 0.0, 0.0, c, s, 0.0, -s, c); }
-  mat3 rotY(float a) { float c = cos(a), s = sin(a); return mat3(c, 0.0, -s, 0.0, 1.0, 0.0, s, 0.0, c); }
-  float pick(vec4 v, float i) { return i < 0.5 ? v.x : i < 1.5 ? v.y : i < 2.5 ? v.z : v.w; }
-
-  void main() {
-    // Unsorted work: a loose cloud that churns harder when agitated.
-    float th = aSeed.y * 6.2831 + uTime * (0.05 + aSeed.z * 0.12);
-    float ph = acos(2.0 * aSeed.z - 1.0);
-    float rad = 4.2 + aSeed.x * 4.8;
-    vec3 chaos = vec3(sin(ph) * cos(th), cos(ph) * 0.62, sin(ph) * sin(th)) * rad;
-    chaos += vec3(sin(uTime * 0.6 + aSeed.w * 40.0), cos(uTime * 0.5 + aSeed.x * 30.0), sin(uTime * 0.4 + aSeed.y * 20.0)) * (0.06 + 0.24 * uAgit);
-
-    // Sorted work: riding one of the four agent orbits.
-    float r = pick(uRingR, aRing), tilt = pick(uRingTilt, aRing), yaw = pick(uRingYaw, aRing), sp = pick(uRingSpeed, aRing);
-    float a = aPhase + uTime * sp;
-    vec3 orbit = rotY(yaw) * rotX(tilt) * vec3(cos(a) * r, (aSeed.x - 0.5) * 0.12, sin(a) * r);
-
-    // Finished work: half the particles stream out along lanes through the gate a person holds.
-    float lanes = step(0.35, aSeed.w) * uFlow;
-    float x = mod(aPhase / 6.2831 * 9.0 + uTime * 0.8, 9.0) - 0.6;
-    float spread = smoothstep(0.0, 2.2, x);
-    float squeeze = 1.0 - 0.72 * exp(-pow(x - uGateX, 2.0) * 1.2);
-    vec3 lane = vec3(x, (aLane - 0.5) * 2.4 * spread * squeeze, (aSeed.y - 0.5) * 1.2 * spread * squeeze);
-
-    vec3 p = mix(mix(chaos, orbit, uOrder), lane, lanes);
-    vec4 mv = modelViewMatrix * vec4(p, 1.0);
-    gl_Position = projectionMatrix * mv;
-    gl_PointSize = uSize * (0.55 + aSeed.x * 0.9) / -mv.z;
-
-    float passed = lanes * smoothstep(uGateX - 0.2, uGateX + 0.6, x);
-    vec3 c = mix(uChaos, uOrdered, uOrder);
-    c = mix(c, uOut, passed);
-    float focused = uFocus >= 0.0 && abs(aRing - uFocus) < 0.5 ? 1.0 : 0.0;
-    c = mix(c, uFocusColor, focused * uOrder * 0.85);
-    vColor = c;
-    vAlpha = (0.35 + 0.65 * aSeed.z) * smoothstep(26.0, 6.0, -mv.z) * (1.0 + focused * 0.6);
+function agentAt(p: number, out: THREE.Vector3) {
+  const path = AGENT_PATH;
+  if (p <= path[0].p) return out.set(...path[0].at);
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i], b = path[i + 1];
+    if (p <= b.p) {
+      const e = smooth(a.p, b.p, p);
+      return out.set(a.at[0] + (b.at[0] - a.at[0]) * e, a.at[1] + (b.at[1] - a.at[1]) * e, a.at[2] + (b.at[2] - a.at[2]) * e);
+    }
   }
-`;
-
-const PARTICLE_FRAGMENT = /* glsl */ `
-  varying vec3 vColor;
-  varying float vAlpha;
-  void main() {
-    vec2 c = gl_PointCoord - 0.5;
-    float d = length(c);
-    float a = smoothstep(0.5, 0.0, d);
-    gl_FragColor = vec4(vColor, a * a * vAlpha);
-  }
-`;
-
-function glowTexture(color: string) {
-  const c = document.createElement("canvas");
-  c.width = c.height = 128;
-  const g = c.getContext("2d")!;
-  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
-  grad.addColorStop(0, color);
-  grad.addColorStop(1, "rgba(0,0,0,0)");
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 128, 128);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/** The peak from the Akrithos mark, extruded: an open chevron with bevelled edges. */
-function peakGeometry() {
-  const s = new THREE.Shape();
-  s.moveTo(-1.15, -0.9);
-  s.lineTo(0, 1.25);
-  s.lineTo(1.15, -0.9);
-  s.lineTo(0.66, -0.9);
-  s.lineTo(0, 0.38);
-  s.lineTo(-0.66, -0.9);
-  s.closePath();
-  const g = new THREE.ExtrudeGeometry(s, { depth: 0.42, bevelEnabled: true, bevelThickness: 0.07, bevelSize: 0.05, bevelSegments: 4 });
-  g.center();
-  return g;
+  return out.set(...path[path.length - 1].at);
 }
 
 export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): World {
@@ -162,223 +128,346 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
   // Shader checks stall on the GPU and echo harmless driver notes; keep them for development, where they catch real errors.
   renderer.debug.checkShaderErrors = process.env.NODE_ENV !== "production";
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMappingExposure = 1.1;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.shadowMap.enabled = !opts.lite;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
   scene.background = COLORS.bg.clone();
-  scene.fog = new THREE.FogExp2(COLORS.bg.getHex(), 0.035);
+  scene.fog = new THREE.Fog(COLORS.bg.getHex(), 7, 13); // the room melts into the dark at its edges
+  // Soft reflections from a studio room.
   const pmrem = new THREE.PMREMGenerator(renderer);
   const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   scene.environment = envTex;
-  scene.environmentIntensity = 0.45;
+  scene.environmentIntensity = 0.22;
 
-  const camera = new THREE.PerspectiveCamera(34, 1, 0.1, 80);
+  const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 40);
 
-  // Light: a soft key, a warm ember heart in the peak, a gold rim, and one that follows the cursor.
-  const key = new THREE.DirectionalLight(0xffffff, 1.1);
-  key.position.set(4, 6, 6);
-  const heart = new THREE.PointLight(COLORS.ember, 18, 9, 1.6);
-  const rim = new THREE.PointLight(COLORS.gold, 22, 14, 1.4);
-  rim.position.set(-3.5, 2.5, -3);
-  const cursor = new THREE.PointLight(0xffe2c8, 0, 10, 1.6);
-  scene.add(new THREE.AmbientLight(0x2a2f38, 0.6), key, heart, rim, cursor);
+  // Light, as in the artwork: a warm key from the upper left, a lamp-warm pool over the desk, a gold rim from behind.
+  const key = new THREE.DirectionalLight(0xffe9cf, 1.1);
+  key.position.set(-3.5, 6, 2.5);
+  key.target.position.copy(DESK);
+  key.castShadow = !opts.lite;
+  key.shadow.mapSize.set(2048, 2048);
+  Object.assign(key.shadow.camera, { left: -3.5, right: 3.5, top: 3.5, bottom: -3.5, near: 1, far: 14 });
+  key.shadow.bias = -0.0005;
+  key.shadow.radius = 4;
+  scene.add(key.target);
+  const lamp = new THREE.PointLight(0xffd2a0, 1.6, 4.5, 1.6);
+  lamp.position.set(DESK.x - 0.4, 2.6, DESK.z - 0.2);
+  const rim = new THREE.PointLight(COLORS.gold, 6, 7, 1.5);
+  rim.position.set(1.4, 2.6, -2.2);
+  const cursor = new THREE.PointLight(0xffe2c8, 0, 6, 1.6);
+  scene.add(new THREE.HemisphereLight(0x4a4038, 0x0c0a09, 1.3), key, lamp, rim);
+  if (!opts.lite) scene.add(cursor); // the light that follows the pointer: computers with a mouse only
 
-  // The peak.
-  const peakMat = new THREE.MeshPhysicalMaterial({ color: new THREE.Color("#9C4A30"), metalness: 0.92, roughness: 0.26, clearcoat: 0.6, clearcoatRoughness: 0.25, emissive: COLORS.ember, emissiveIntensity: 0.12 });
-  const peak = new THREE.Mesh(peakGeometry(), peakMat);
-  const core = new THREE.Group();
-  core.add(peak);
-  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture("rgba(232,113,74,0.9)"), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.6 }));
-  halo.scale.setScalar(5.5);
-  halo.position.z = -0.6;
-  core.add(halo);
-  scene.add(core);
+  // Paper: printed on top, plain edges.
+  const tex = paperTexture();
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  const paperEdge = new THREE.MeshStandardMaterial({ color: new THREE.Color("#E6E2DA"), roughness: 0.85 });
+  const paperFace = new THREE.MeshStandardMaterial({ map: tex, color: new THREE.Color("#DCD7CE"), roughness: 0.8 });
+  const paperMats = [paperEdge, paperEdge, paperFace, paperEdge, paperEdge, paperEdge];
 
-  // The four agent orbits, each with an agent riding it.
-  const ringGroup = new THREE.Group();
-  const ringMats: THREE.MeshBasicMaterial[] = [];
-  const nodes: THREE.Mesh[] = [];
-  RINGS.forEach((ring) => {
-    const holder = new THREE.Group();
-    holder.rotation.order = "YXZ";
-    holder.rotation.y = ring.yaw;
-    holder.rotation.x = ring.tilt;
-    const mat = new THREE.MeshBasicMaterial({ color: COLORS.gold, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-    ringMats.push(mat);
-    // Torus lies in XY; turn it into the orbit plane (XZ before tilt) to match the particle orbits.
-    const torus = new THREE.Mesh(new THREE.TorusGeometry(ring.r, 0.012, 6, 160), mat);
-    torus.rotation.x = Math.PI / 2;
-    holder.add(torus);
-    const node = new THREE.Mesh(new THREE.SphereGeometry(0.11, 20, 14), new THREE.MeshBasicMaterial({ color: COLORS.gold, transparent: true, opacity: 0 }));
-    const nodeGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture("rgba(212,163,95,1)"), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
-    nodeGlow.scale.setScalar(0.9);
-    node.add(nodeGlow);
-    holder.add(node);
-    nodes.push(node);
-    ringGroup.add(holder);
-  });
-  scene.add(ringGroup);
+  const office = createOffice(DESK, BOX, paperMats, opts.lite);
+  scene.add(office.group);
 
-  // Work: one particle per piece of work.
-  const N = opts.lite ? 600 : 1600;
-  const geo = new THREE.BufferGeometry();
-  const seed = new Float32Array(N * 4), ringIdx = new Float32Array(N), phase = new Float32Array(N), laneA = new Float32Array(N);
-  for (let i = 0; i < N; i++) {
-    seed.set([Math.random(), Math.random(), Math.random(), Math.random()], i * 4);
-    ringIdx[i] = i % 4;
-    phase[i] = Math.random() * Math.PI * 2;
-    laneA[i] = Math.floor(Math.random() * 5) / 4;
-  }
-  geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(N * 3), 3));
-  geo.setAttribute("aSeed", new THREE.BufferAttribute(seed, 4));
-  geo.setAttribute("aRing", new THREE.BufferAttribute(ringIdx, 1));
-  geo.setAttribute("aPhase", new THREE.BufferAttribute(phase, 1));
-  geo.setAttribute("aLane", new THREE.BufferAttribute(laneA, 1));
-  const uniforms = {
-    uTime: { value: 0 }, uAgit: { value: 0.4 }, uOrder: { value: 0 }, uFlow: { value: 0 }, uFocus: { value: -1 },
-    uSize: { value: (opts.lite ? 70 : 90) * dpr },
-    uRingR: { value: new THREE.Vector4(...RINGS.map((r) => r.r)) },
-    uRingTilt: { value: new THREE.Vector4(...RINGS.map((r) => r.tilt)) },
-    uRingYaw: { value: new THREE.Vector4(...RINGS.map((r) => r.yaw)) },
-    uRingSpeed: { value: new THREE.Vector4(...RINGS.map((r) => r.speed)) },
-    uGateX: { value: GATE_X },
-    uChaos: { value: new THREE.Color("#8F8A80") },
-    uOrdered: { value: COLORS.gold.clone() },
-    uOut: { value: COLORS.ember.clone() },
-    uFocusColor: { value: new THREE.Color("#FFB98F") },
+  // The person, from the artwork: one cut-out per step, the next one dissolving in over the last when the step changes.
+  const loader = new THREE.TextureLoader();
+  const faces = opts.people.map((src) => { const t = loader.load(src, () => still()); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; });
+  const personGeo = new THREE.PlaneGeometry(PERSON.w, PERSON.h);
+  const layer = () => {
+    const m = new THREE.Mesh(personGeo, new THREE.MeshBasicMaterial({ transparent: true, alphaTest: 0.02, depthWrite: false, toneMapped: false, color: new THREE.Color(0.92, 0.9, 0.88) }));
+    m.position.copy(PERSON.at);
+    m.renderOrder = 1;
+    scene.add(m);
+    return m;
   };
-  const particles = new THREE.Points(geo, new THREE.ShaderMaterial({ uniforms, vertexShader: PARTICLE_VERTEX, fragmentShader: PARTICLE_FRAGMENT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
-  particles.frustumCulled = false;
-  scene.add(particles);
+  // A soft shadow just behind the person, so they sit in the room rather than on top of it.
+  const shadeTex = glowTexture("rgba(0,0,0,0.55)");
+  const shade = new THREE.Mesh(new THREE.PlaneGeometry(PERSON.w * 1.15, PERSON.h * 1.05), new THREE.MeshBasicMaterial({ map: shadeTex, transparent: true, depthWrite: false }));
+  shade.position.copy(PERSON.at).add(new THREE.Vector3(0.02, -0.03, -0.08));
+  shade.renderOrder = 0;
+  scene.add(shade);
+  const faceBack = layer(), faceFront = layer();
+  faceFront.renderOrder = 2;
+  let shownFace = -1, faceFade = 1;
 
-  // The boundary: a faceted shell that closes around the system.
-  const shellMat = new THREE.LineBasicMaterial({ color: COLORS.gold, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
-  const shell = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.IcosahedronGeometry(6.4, 1)), shellMat);
-  scene.add(shell);
+  // The agent: small and friendly.
+  const helper = createHelper();
+  scene.add(helper.group);
 
-  // The gate a person holds: work only becomes an outcome after passing through it.
-  const gateMat = new THREE.MeshStandardMaterial({ color: COLORS.gold, emissive: COLORS.gold, emissiveIntensity: 0, metalness: 0.8, roughness: 0.3, transparent: true, opacity: 0 });
-  const gate = new THREE.Mesh(new THREE.TorusGeometry(1.35, 0.06, 16, 120), gateMat);
-  gate.position.x = GATE_X;
-  gate.rotation.y = Math.PI / 2;
-  const gateGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture("rgba(212,163,95,0.8)"), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
-  gateGlow.scale.setScalar(4.2);
-  gateGlow.position.x = GATE_X;
-  scene.add(gate, gateGlow);
+  // The work: one sheet of paper per piece of work.
+  const N = opts.lite ? 80 : 110;
+  const GAP = PILE_H / N;
+  const M = opts.reduced ? 0 : 5; // sheets that keep coming in through the door
+  const cards = new THREE.InstancedMesh(new THREE.BoxGeometry(CARD.w, Math.min(0.006, GAP * 0.9), CARD.d), paperMats, N + M);
+  cards.castShadow = !opts.lite;
+  cards.receiveShadow = !opts.lite;
+  cards.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  cards.frustumCulled = false;
+  scene.add(cards);
 
-  // A warm pool of light under everything, and far dust for depth.
-  const pool = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: glowTexture("rgba(190,76,51,0.55)"), transparent: true, depthWrite: false, opacity: 0.5 }));
-  pool.rotation.x = -Math.PI / 2;
-  pool.position.y = -3.4;
-  scene.add(pool);
-  const dustGeo = new THREE.BufferGeometry();
-  const dust = new Float32Array((opts.lite ? 250 : 600) * 3);
-  for (let i = 0; i < dust.length; i += 3) dust.set([(Math.random() - 0.5) * 60, (Math.random() - 0.3) * 30, -10 - Math.random() * 30], i);
-  dustGeo.setAttribute("position", new THREE.BufferAttribute(dust, 3));
-  scene.add(new THREE.Points(dustGeo, new THREE.PointsMaterial({ color: 0x6b665a, size: 0.06, transparent: true, opacity: 0.6, depthWrite: false })));
+  type Card = { r: number[]; paper: THREE.Color; spill: boolean; check: number; kind: number; slot: number; pos: THREE.Vector3; quat: THREE.Quaternion; scale: number; color: THREE.Color };
+  const list: Card[] = [];
+  const checks = Array.from({ length: N }, (_, i) => i === 20 || i === 41 || i === 62); // three for the person
+  const slots = [0, 0, 0, 0];
+  for (let i = 0; i < N + M; i++) {
+    const kind = i % 4;
+    list.push({
+      r: [Math.random(), Math.random(), Math.random(), Math.random()],
+      paper: PAPER[i % PAPER.length].clone(),
+      spill: i < N && i / N > 0.62 && !checks[i] && i % 6 === 1, // a few near the top slide off
+      check: checks[i] ? checks.slice(0, i).filter(Boolean).length : -1,
+      kind,
+      slot: i < N && !checks[i] ? slots[kind]++ : 0, // its place in its kind's stack
+      pos: new THREE.Vector3(DOOR.x, DOOR.y, DOOR.z),
+      quat: new THREE.Quaternion(),
+      scale: 0,
+      color: PAPER[i % PAPER.length].clone(),
+    });
+  }
+
+  // The agent reading the pile: a thin gold frame around it, with a beam sweeping up and down.
+  const scanMat = new THREE.LineBasicMaterial({ color: COLORS.gold, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false });
+  const scanFrame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(CARD.w + 0.1, 1, CARD.d + 0.1)), scanMat);
+  const beamMat = new THREE.MeshBasicMaterial({ color: new THREE.Color("#E8714A"), transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+  const beam = new THREE.Mesh(new THREE.PlaneGeometry(CARD.w + 0.16, CARD.d + 0.16), beamMat);
+  beam.rotation.x = -Math.PI / 2;
+  scene.add(scanFrame, beam);
+
+  // The shield: a dome of light over the desk, the person and the agent; clear in the middle, glowing at its edge.
+  const shieldMat = glowMaterial("#D4A35F", { power: 4.5, base: 0.0, fadeFrom: -1, fadeTo: 0 });
+  const shield = new THREE.Mesh(new THREE.SphereGeometry(1.75, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2), shieldMat);
+  shield.position.set(0.1, 0, -0.3);
+  scene.add(shield);
+
+  // A warm glow over the inbox box as finished work arrives, and a soft ring under the stack being shown.
+  const boxGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture("rgba(212,163,95,0.9)"), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0 }));
+  boxGlow.scale.setScalar(0.9);
+  boxGlow.position.set(BOX.x, BOX.y + 0.25, BOX.z);
+  scene.add(boxGlow);
+  const focusRing = new THREE.Mesh(new THREE.RingGeometry(0.2, 0.23, 48), new THREE.MeshBasicMaterial({ color: COLORS.gold, transparent: true, opacity: 0, depthWrite: false }));
+  focusRing.rotation.x = -Math.PI / 2;
+  scene.add(focusRing);
 
   let composer: EffectComposer | null = null;
   if (!opts.lite) {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.48, 0.5, 0.42));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(256, 256), 0.3, 0.5, 0.92));
     composer.addPass(new OutputPass());
   }
 
   // ---- state ----
-  const current = { ...BEATS[0], pos: [...BEATS[0].pos] as Beat["pos"], look: [...BEATS[0].look] as Beat["look"] };
-  let target: Beat = BEATS[0];
+  let targetP = 0, p = 0;
   const pointer = { x: 0, y: 0, sx: 0, sy: 0 };
   let focus = -1;
-  let active = true, destroyed = false, raf = 0;
+  let active = true, destroyed = false, raf = 0, started = false;
   let t = 0, last = performance.now(), frames = 0, acc = 0, fps = 60;
-  const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), tmp = new THREE.Vector3();
+  let width = 1, height = 1;
+  const camPos = new THREE.Vector3(), camLook = new THREE.Vector3(), agentPos = new THREE.Vector3();
+  const tPos = new THREE.Vector3(), tQuat = new THREE.Quaternion(), tColor = new THREE.Color(), euler = new THREE.Euler(), matrix = new THREE.Matrix4(), one = new THREE.Vector3(), yAxis = new THREE.Vector3(0, 1, 0);
 
-  function mixBeats(p: number): Beat {
-    const i = Math.max(0, Math.min(BEATS.length - 1, Math.floor(p)));
+  function beatAt(x: number) {
+    const i = Math.max(0, Math.min(BEATS.length - 1, Math.floor(x)));
     const j = Math.min(BEATS.length - 1, i + 1);
-    const f = Math.max(0, Math.min(1, p - i));
-    const e = f * f * (3 - 2 * f);
+    const e = smooth(0, 1, x - i);
     const a = BEATS[i], b = BEATS[j];
-    const l = (x: number, y: number) => x + (y - x) * e;
-    return { pos: [l(a.pos[0], b.pos[0]), l(a.pos[1], b.pos[1]), l(a.pos[2], b.pos[2])], look: [l(a.look[0], b.look[0]), l(a.look[1], b.look[1]), l(a.look[2], b.look[2])], agit: l(a.agit, b.agit), order: l(a.order, b.order), boundary: l(a.boundary, b.boundary), gate: l(a.gate, b.gate), flow: l(a.flow, b.flow), glow: l(a.glow, b.glow) };
+    const l = (u: number, v: number) => u + (v - u) * e;
+    return { pos: a.pos.map((v, k) => l(v, b.pos[k])), look: a.look.map((v, k) => l(v, b.look[k])), fov: l(a.fov, b.fov) };
   }
 
   function resize() {
-    const w = canvas.clientWidth || window.innerWidth, h = canvas.clientHeight || window.innerHeight;
-    renderer.setSize(w, h, false);
-    composer?.setSize(w, h);
-    camera.aspect = w / h;
+    width = canvas.clientWidth || window.innerWidth;
+    height = canvas.clientHeight || window.innerHeight;
+    renderer.setSize(width, height, false);
+    composer?.setSize(width, height);
+    camera.aspect = width / height;
+    // Wide screens: shift the picture right so the scene sits beside the copy, not under it.
+    const shift = camera.aspect > 1.2 ? Math.round(width * 0.17) : 0;
+    if (shift) camera.setViewOffset(width, height, -shift, 0, width, height); else camera.clearViewOffset();
     camera.updateProjectionMatrix();
   }
-  const onResize = () => { resize(); if (opts.reduced) draw(0); };
+  // Reduced motion draws single still frames on demand: only while the scene is on screen, and once scrolling settles.
+  let stillTimer = 0;
+  const still = () => {
+    if (!opts.reduced || !started) return;
+    window.clearTimeout(stillTimer);
+    stillTimer = window.setTimeout(() => { if (active && !destroyed) draw(0); }, 120);
+  };
+  const onResize = () => { resize(); still(); };
   window.addEventListener("resize", onResize);
   resize();
 
   function step(dt: number) {
-    const k = opts.reduced ? 1 : Math.min(1, dt * 2.6);
-    const lerp = (a: number, b: number) => a + (b - a) * k;
-    current.agit = lerp(current.agit, target.agit);
-    current.order = lerp(current.order, target.order);
-    current.boundary = lerp(current.boundary, target.boundary);
-    current.gate = lerp(current.gate, target.gate);
-    current.flow = lerp(current.flow, target.flow);
-    current.glow = lerp(current.glow, target.glow);
-    for (let i = 0; i < 3; i++) { current.pos[i] = lerp(current.pos[i], target.pos[i]); current.look[i] = lerp(current.look[i], target.look[i]); }
+    // Each step's action plays through on its own once the reader reaches the step, so it always finishes, wherever
+    // they stop: the story moves towards the step on screen at a calm, steady pace (faster when far behind).
+    const goal = Math.max(0, Math.min(5, Math.round(targetP)));
+    const gap = goal - p;
+    const speed = 0.45 + 0.9 * Math.max(0, Math.abs(gap) - 1);
+    p = opts.reduced ? goal : p + Math.sign(gap) * Math.min(Math.abs(gap), speed * dt);
     pointer.sx += (pointer.x - pointer.sx) * Math.min(1, dt * 3);
     pointer.sy += (pointer.y - pointer.sy) * Math.min(1, dt * 3);
 
-    // Portrait screens: everything centred and further back (the copy sits above and below).
+    // The story, as numbers from 0 to 1.
+    const load = 0.62 + 0.38 * smooth(0, 1.1, p); // how full the pile is
+    // (Step k's action plays while the story moves from k - 1 to k.)
+    const spill = smooth(0.4, 1.0, p); // pieces sliding off
+    const ringing = smooth(0.5, 0.8, p) * (1 - smooth(1.3, 1.45, p)); // the missed call
+    const agent = smooth(1.02, 1.2, p); // the agent popping up
+    const wave = smooth(1.08, 1.16, p) * (1 - smooth(1.34, 1.42, p));
+    const sort = smooth(1.5, 1.98, p); // the pile being sorted into four stacks
+    const boundary = smooth(2.3, 2.85, p) - smooth(3.05, 3.35, p);
+    const done = smooth(3.2, 3.7, p); // the stacks filed into the box
+    const handed = smooth(3.45, 3.8, p); // the few brought to the person
+    const checked = smooth(4.2, 4.75, p); // the person has checked them
+    const incoming = 1 - smooth(1.0, 1.3, p);
+    // "Your information stays inside": the agent closes and locks the door, the shield forms, every step is logged.
+    const doorShut = smooth(2.4, 2.65, p);
+    const locked = smooth(2.62, 2.78, p);
+    const logged = smooth(2.15, 3.0, p);
+    const pileCount = Math.round(N * load);
+    const step0 = Math.max(0, Math.min(5, Math.round(p))); // the face changes halfway: after the agent has said hello
+
+    // Camera: the artwork's angle, moving a little per step. Portrait screens step back and centre on the desk.
+    const beat = beatAt(p);
     const portrait = camera.aspect < 0.9;
-    const back = portrait ? 1.75 : camera.aspect < 1.3 ? 1.25 : 1;
-    camPos.set(current.pos[0] * back + pointer.sx * 0.6, current.pos[1] + pointer.sy * 0.4, current.pos[2] * back);
-    camLook.set(portrait ? 0.8 * current.flow : current.look[0], portrait ? 0.6 : current.look[1], current.look[2]);
+    const back = portrait ? 1.6 : camera.aspect < 1.3 ? 1.2 : 1;
+    camLook.set(beat.look[0] - (portrait ? 0.35 : 0), beat.look[1] + (portrait ? 0.35 : 0), beat.look[2]);
+    camPos.set(beat.pos[0] - beat.look[0], beat.pos[1] - beat.look[1], beat.pos[2] - beat.look[2]).multiplyScalar(back).add(camLook);
+    camPos.x += pointer.sx * 0.15;
+    camPos.y += pointer.sy * 0.1;
     camera.position.copy(camPos);
     camera.lookAt(camLook);
+    if (camera.fov !== beat.fov) { camera.fov = beat.fov; camera.updateProjectionMatrix(); }
 
-    uniforms.uTime.value = t * CALM;
-    uniforms.uAgit.value = current.agit;
-    uniforms.uOrder.value = current.order;
-    uniforms.uFlow.value = current.flow;
-    uniforms.uFocus.value = focus;
-    ringMats.forEach((m, i) => { m.opacity = current.order * (focus === i ? 0.75 : 0.28); });
-    nodes.forEach((n, i) => {
-      const ring = RINGS[i];
-      const a = t * CALM * ring.speed + i * 1.7;
-      n.position.set(Math.cos(a) * ring.r, 0, Math.sin(a) * ring.r);
-      (n.material as THREE.MeshBasicMaterial).opacity = current.order;
-      ((n.children[0] as THREE.Sprite).material as THREE.SpriteMaterial).opacity = current.order * (focus === i ? 1 : 0.65);
-      n.scale.setScalar(focus === i ? 1.6 : 1);
-    });
-    shellMat.opacity = current.boundary * 0.32;
-    shell.rotation.y = t * 0.03;
-    shell.scale.setScalar(1.35 - 0.35 * current.boundary);
-    gateMat.opacity = current.gate;
-    gateMat.emissiveIntensity = current.gate * (1.4 + 0.3 * Math.sin(t * 1.1));
-    (gateGlow.material as THREE.SpriteMaterial).opacity = current.gate * 0.55;
-
-    // A gentle sway (never edge-on), so the mark always reads.
-    peak.rotation.y = opts.reduced ? 0.35 : Math.sin(t * 0.32) * 0.55 + pointer.sx * 0.25;
-    peak.rotation.x = Math.sin(t * 0.5) * 0.08 + pointer.sy * 0.15;
-    core.position.y = Math.sin(t * 0.8) * 0.12;
-    peakMat.emissiveIntensity = 0.04 + current.glow * 0.14;
-    heart.intensity = 4 + current.glow * 10;
-    (halo.material as THREE.SpriteMaterial).opacity = 0.18 + current.glow * 0.3;
-    cursor.intensity = opts.lite ? 0 : 7;
-    cursor.position.set(pointer.sx * 6, 1 + pointer.sy * 3, 4);
-
-    if (opts.onLabels) {
-      const w = canvas.clientWidth, h = canvas.clientHeight;
-      const gatePos = tmp.set(GATE_X, 1.7, 0).project(camera);
-      const gateLabel = { x: (gatePos.x * 0.5 + 0.5) * w, y: (-gatePos.y * 0.5 + 0.5) * h, visible: current.gate > 0.6 && gatePos.z < 1 };
-      opts.onLabels([...nodes.map((n) => {
-        n.getWorldPosition(tmp);
-        tmp.project(camera);
-        const x = (tmp.x * 0.5 + 0.5) * w, y = (-tmp.y * 0.5 + 0.5) * h;
-        return { x, y, visible: current.order > 0.6 && current.flow < 0.5 && tmp.z < 1 && y > 90 && y < h - 70 && x > 10 && x < w - 180 };
-      }), gateLabel]);
+    // The person: the step's cut-out, facing the camera, dissolving in over the last in half a second.
+    if (step0 !== shownFace) {
+      (faceBack.material as THREE.MeshBasicMaterial).map = shownFace >= 0 ? faces[shownFace] : faces[step0];
+      (faceBack.material as THREE.MeshBasicMaterial).needsUpdate = true;
+      (faceFront.material as THREE.MeshBasicMaterial).map = faces[step0];
+      (faceFront.material as THREE.MeshBasicMaterial).needsUpdate = true;
+      faceFade = shownFace < 0 || opts.reduced ? 1 : 0;
+      shownFace = step0;
     }
+    faceFade = Math.min(1, faceFade + dt / 0.5);
+    (faceFront.material as THREE.MeshBasicMaterial).opacity = faceFade;
+    faceBack.visible = faceFade < 1;
+    [faceBack, faceFront, shade].forEach((m) => m.quaternion.copy(camera.quaternion));
+
+    // The agent: pops up, waves hello, then goes where the work is.
+    agentAt(p, agentPos);
+    helper.group.position.copy(agentPos);
+    const busy = smooth(1.45, 1.55, p) * (1 - smooth(1.9, 2.0, p)) + smooth(2.35, 2.45, p) * (1 - smooth(2.7, 2.8, p)) + smooth(3.45, 3.55, p) * (1 - smooth(3.8, 3.9, p));
+    helper.update(agent, wave, busy, camera.position, t);
+
+    // The scan: as the agent starts on the pile.
+    const scan = smooth(1.4, 1.5, p) * (1 - smooth(1.58, 1.7, p));
+    const pileTop = Math.max(0.1, Math.round(pileCount * (1 - sort)) * GAP + 0.04);
+    scanFrame.scale.set(1, pileTop, 1);
+    scanFrame.position.set(PILE.x + 0.01, DESK.y + pileTop / 2, PILE.z);
+    scanMat.opacity = scan * 0.8;
+    beam.position.set(PILE.x + 0.01, DESK.y + pileTop * (0.5 + 0.48 * Math.sin(t * 1.6)), PILE.z);
+    beamMat.opacity = scan * 0.35;
+
+    shieldMat.uniforms.opacity.value = Math.max(0, boundary) * 0.35;
+    shield.scale.setScalar(1.15 - 0.15 * clamp01(boundary));
+    shield.rotation.y = t * CALM * 0.1;
+    office.setGlow(done * (0.16 + 0.05 * Math.sin(t * 1.4)));
+    office.setTidy(sort);
+    office.setPhone(ringing * (0.55 + 0.45 * Math.sin(t * 7)));
+    office.setDoor(1 - doorShut);
+    office.setLock(locked);
+    office.setLog(logged);
+    (boxGlow.material as THREE.SpriteMaterial).opacity = done * (1 - checked * 0.5) * 0.35;
+    lamp.intensity = 1.6 + 1.2 * smooth(1.5, 5, p);
+    const ring = focusRing.material as THREE.MeshBasicMaterial;
+    ring.opacity += ((focus >= 0 && sort > 0.5 && done < 0.5 ? 0.8 : 0) - ring.opacity) * Math.min(1, dt * 6);
+    if (focus >= 0) focusRing.position.set(STACKS[focus].x, DESK.y + 0.003, STACKS[focus].z);
+
+    // The paper.
+    for (let i = 0; i < N + M; i++) {
+      const c = list[i];
+      let scale = 1;
+      if (i >= N) {
+        // Coming in: through the open door, across the room in an arc, onto the top of the pile.
+        const j = i - N;
+        const u = ((t * CALM * 0.5 + j / M) % 1 + 1) % 1;
+        const e = u * u * (3 - 2 * u);
+        const top = DESK.y + pileCount * GAP + 0.03;
+        const sx = DOOR.x + (c.r[0] - 0.5) * 0.4, sy = DOOR.y + (c.r[1] - 0.5) * 0.5, sz = DOOR.z;
+        tPos.set(sx + (PILE.x - sx) * e, sy + (top - sy) * e + Math.sin(Math.PI * e) * 0.7, sz + (PILE.z - sz) * e);
+        c.pos.copy(tPos);
+        euler.set((1 - e) * (c.r[3] - 0.5) * 2.4, (1 - e) * c.r[0] * 5, (1 - e) * (c.r[1] - 0.5) * 1.8);
+        c.quat.setFromEuler(euler);
+        c.scale = incoming * (u < 0.06 ? u / 0.06 : u > 0.94 ? (1 - u) / 0.06 : 1);
+        c.color.copy(c.paper);
+      } else {
+        const rank = (N - 1 - i) / (N - 1); // top of the pile goes first
+        const isSorted = i < pileCount && (sort > rank * 0.92 + 0.04 || (c.spill && sort > 0.15));
+        const isCheck = c.check >= 0;
+        const isDone = isSorted && !isCheck && done > (c.kind * 0.22 + c.r[2] * 0.1);
+        if (isSorted && isCheck && handed > 0 && checked < (c.check + 1) / 3.2) {
+          // The few that need a decision: brought to the person, in a neat little stack in front of them.
+          tPos.set(CHECK.x, CHECK.y + 0.004 + c.check * 0.007, CHECK.z);
+          tQuat.setFromAxisAngle(yAxis, 0.3 + (c.r[0] - 0.5) * 0.12);
+          tColor.copy(COLORS.check);
+        } else if (isSorted && isCheck && checked >= (c.check + 1) / 3.2) {
+          // Checked: into the box with the rest.
+          tPos.set(BOX.x, BOX.y + 0.05, BOX.z);
+          tQuat.identity();
+          tColor.copy(COLORS.gold);
+          scale = c.pos.distanceTo(tPos) < 0.12 ? 0 : 0.9;
+        } else if (isDone) {
+          // Finished: dropped into the inbox box, kind by kind, where it joins the folders.
+          tPos.set(BOX.x + (c.r[0] - 0.5) * 0.08, BOX.y + 0.05, BOX.z + (c.r[1] - 0.5) * 0.06);
+          tQuat.setFromAxisAngle(yAxis, (c.r[3] - 0.5) * 0.3);
+          tColor.copy(COLORS.gold);
+          scale = c.pos.distanceTo(tPos) < 0.12 ? 0 : 0.9;
+        } else if (isSorted) {
+          // Sorted: onto its kind's stack along the front of the desk (the checks wait on top of the first one).
+          const s = STACKS[c.kind];
+          tPos.set(s.x + (c.r[0] - 0.5) * 0.01, s.y + 0.004 + (isCheck ? 30 + c.check : c.slot) * 0.0062, s.z + (c.r[1] - 0.5) * 0.01);
+          tQuat.setFromAxisAngle(yAxis, (c.r[2] - 0.5) * 0.08);
+          tColor.copy(focus === c.kind ? COLORS.focus : KINDS[c.kind]);
+        } else if (c.spill && spill > c.r[1] * 0.6 + 0.2) {
+          // Missed: slid off the pile onto the floor in front of the desk.
+          tPos.set(-1.55 + c.r[0] * 0.9, 0.006, 0.6 + c.r[1] * 1.1);
+          tQuat.setFromAxisAngle(yAxis, c.r[2] * 6);
+          tColor.copy(COLORS.missed);
+        } else if (i < pileCount) {
+          // On the pile: it leans a little more the higher it goes.
+          const h = i / N;
+          tPos.set(PILE.x + Math.sin(i * 0.37) * 0.012 + h * h * 0.05, DESK.y + (i + 0.5) * GAP, PILE.z + Math.cos(i * 0.53) * 0.012);
+          euler.set(0, (c.r[0] - 0.5) * 0.22, -h * 0.03);
+          tQuat.setFromEuler(euler);
+          tColor.copy(c.paper);
+        } else {
+          // Not arrived yet: waiting out of sight, beyond the door.
+          tPos.copy(DOOR).setZ(DOOR.z - 0.5);
+          tQuat.identity();
+          tColor.copy(c.paper);
+          scale = 0;
+        }
+        // Lift over things on the way: aim above the target while still far from it.
+        const far = c.pos.distanceTo(tPos);
+        if (scale > 0 && far > 0.05) tPos.y += Math.min(0.45, far * 0.6);
+        const kc = opts.reduced ? 1 : Math.min(1, dt * (1.6 + c.r[3] * 1.4));
+        c.pos.lerp(tPos, kc);
+        c.quat.slerp(tQuat, kc);
+        c.scale += (scale - c.scale) * kc;
+        c.color.lerp(tColor, kc);
+      }
+      matrix.compose(c.pos, c.quat, one.setScalar(Math.max(0.0001, c.scale)));
+      cards.setMatrixAt(i, matrix);
+      cards.setColorAt(i, c.color);
+    }
+    cards.instanceMatrix.needsUpdate = true;
+    if (cards.instanceColor) cards.instanceColor.needsUpdate = true;
+
+    cursor.intensity = opts.lite ? 0 : 1.2;
+    cursor.position.set(pointer.sx * 2.5, 2 + pointer.sy * 1.2, 1.5);
   }
 
   function draw(dt: number) {
@@ -408,21 +497,23 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
   canvas.addEventListener("webglcontextlost", (e) => { e.preventDefault(); api.destroy(); canvas.dispatchEvent(new CustomEvent("world-failed")); });
 
   const api: World = {
-    setProgress(p) {
-      target = mixBeats(p);
-      if (opts.reduced) { draw(0); }
+    setProgress(next) {
+      targetP = next;
+      still();
     },
     setPointer(x, y) { pointer.x = x; pointer.y = y; },
     setActive(on) {
       active = on;
-      if (on && !opts.reduced && !raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
+      if (on) still();
+      if (on && started && !opts.reduced && !raf) { last = performance.now(); raf = requestAnimationFrame(loop); }
     },
-    focusAgent(i) { focus = i ?? -1; if (opts.reduced) draw(0); },
+    focusAgent(i) { focus = i ?? -1; still(); },
     get fps() { return fps; },
     destroy() {
       if (destroyed) return;
       destroyed = true;
       if (raf) cancelAnimationFrame(raf);
+      window.clearTimeout(stillTimer);
       window.removeEventListener("resize", onResize);
       scene.traverse((o) => {
         const m = o as THREE.Mesh;
@@ -430,6 +521,7 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
         const mats = Array.isArray(m.material) ? m.material : m.material ? [m.material] : [];
         mats.forEach((mat) => { (mat as THREE.MeshBasicMaterial).map?.dispose(); mat.dispose(); });
       });
+      faces.forEach((f) => f.dispose());
       envTex.dispose();
       pmrem.dispose();
       composer?.dispose();
@@ -437,8 +529,29 @@ export function createWorld(canvas: HTMLCanvasElement, opts: WorldOptions): Worl
     },
   };
 
-  // First frame straight away (also the only kind of frame under reduced motion).
-  draw(0.016);
-  if (!opts.reduced) raf = requestAnimationFrame(loop);
+  // Prepare every shader in the background first (doing it in one go would freeze the page), then draw the first
+  // frame (also the only kind of frame under reduced motion).
+  renderer.compileAsync(scene, camera).catch(() => undefined).then(() => {
+    if (destroyed) return;
+    started = true;
+    draw(0.016);
+    opts.onReady?.();
+    last = performance.now();
+    if (!opts.reduced && !raf) raf = requestAnimationFrame(loop);
+  });
   return api;
+}
+
+function glowTexture(color: string) {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d")!;
+  const grad = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  grad.addColorStop(0, color);
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }

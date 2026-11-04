@@ -19,7 +19,7 @@ const bannedPackages = [
   "aceternity-ui",
   "framer-motion",
   "motion",
-  "gsap",
+  // GSAP is allowed from 2026-11-03 (owner's decision): free for commercial sites under its Standard License.
   "lenis",
   "@shadcn/ui",
 ];

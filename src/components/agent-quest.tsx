@@ -8,6 +8,13 @@ import { saveLeadToken, track } from "@/lib/track";
 
 const XP_PER_ROUND = 15;
 const SYSTEMS = ["Revenue agent", "Knowledge copilot", "Operations control", "Service agent"] as const;
+/** What a person still checks, in the visitor's own terms (from who they said should approve). */
+const APPROVAL_LINE: Record<string, string> = {
+  nobody: "Low-risk jobs go straight through, and every step is written down so you can check it later.",
+  lead: "A team leader says yes to anything unusual.",
+  expert: "The right expert says yes to each kind of decision.",
+  always: "A person says yes to every job before it goes out.",
+};
 
 function openAssistant(prefill?: string) {
   window.dispatchEvent(new CustomEvent("akrithos:open-assistant", { detail: { prefill } }));
@@ -31,7 +38,7 @@ export function AgentQuest() {
   const agentIndex = answers.bottleneck ? result.agent?.index ?? -1 : -1;
   const value = current.kind === "choice" ? answers[current.id] : undefined;
   const insight = current.kind === "choice" ? current.choices.find((c) => c.id === value)?.insight : picked[round]
-    ? `That is about ${((answers.hours ?? 0) * 48).toLocaleString("en-US")} hours a year. If even a third of it is repeat work, an agent can take it on.`
+    ? `That is about ${((answers.hours ?? 0) * 48).toLocaleString("en-US")} hours a year. If even a third of it is the same job again and again, an agent can take it on.`
     : undefined;
 
   // Started from the hero: question one arrives already answered, with its insight showing.
@@ -93,7 +100,7 @@ export function AgentQuest() {
     <div className="quest" data-done={done}>
       <div className="quest-card">
         <div className="quest-top">
-          <span className="quest-round">{done ? "Quest complete" : `Round ${round + 1} of ${ROUNDS.length}`}</span>
+          <span className="quest-round">{done ? "Quest complete" : `Question ${round + 1} of ${ROUNDS.length}`}</span>
           <span className="quest-xp" aria-label={`${xp} experience points`}><b>{xp}</b> XP</span>
         </div>
         <div className="quest-progress" aria-hidden="true">
@@ -126,7 +133,7 @@ export function AgentQuest() {
               {round > 0 ? <button type="button" className="button button-ghost" onClick={() => { setRound(round - 1); window.setTimeout(() => headingRef.current?.focus(), 30); }}>Back</button> : <span />}
               {/* autocomplete="off" stops Firefox restoring the enabled state on reload, which broke hydration and let an empty round through. React's types omit it on buttons, hence the spread. */}
               <button ref={nextRef} type="button" className="button button-primary" disabled={!picked[round]} {...{ autoComplete: "off" }} onClick={next}>
-                {round === ROUNDS.length - 1 ? "Reveal my result" : "Next round"}
+                {round === ROUNDS.length - 1 ? "Show my plan" : "Next question"}
               </button>
             </div>
           </div>
@@ -156,7 +163,7 @@ export function AgentQuest() {
         </svg>
         <p className="quest-map-agent">{agentIndex >= 0 ? SYSTEMS[agentIndex] : "Answer to light up your first agent"}</p>
         <dl className="quest-meters">
-          {([["Opportunity", result.meters.opportunity, picked[2]], ["Readiness", result.meters.readiness, picked[3]], ["Control", result.meters.control, picked[5]], ["Momentum", result.meters.momentum, picked[6]]] as const).map(([label, v, known]) => (
+          {([["Time to win back", result.meters.opportunity, picked[2]], ["Know-how ready", result.meters.readiness, picked[3]], ["People in charge", result.meters.control, picked[5]], ["Ready to start", result.meters.momentum, picked[6]]] as const).map(([label, v, known]) => (
             <div key={label}>
               <dt>{label}</dt>
               <dd><span className="quest-meter"><i style={{ transform: `scaleX(${known ? v / 100 : 0})` }} /></span><b>{known ? v : "?"}</b></dd>
@@ -187,17 +194,7 @@ function QuestResult({ result, answers, onBook, onReplay }: { result: Result; an
       <h3 className="quest-level">{result.level.name}</h3>
       <p className="quest-level-line">{result.level.line}</p>
 
-      {result.agent ? (
-        <div className="quest-agent">
-          <p className="quest-agent-label">Your first agent</p>
-          <h4>{result.agent.name}</h4>
-          <p>{result.agent.does}</p>
-          <p className="quest-agent-decides"><span aria-hidden="true">◆</span> {result.agent.decides}</p>
-        </div>
-      ) : null}
-      <p className="quest-hours-at-stake">
-        From your estimate, about <b>{result.hoursPerYear.toLocaleString("en-US")} hours a year</b> go into this work. In the Diagnostic, we work out how much of it an agent can take on.
-      </p>
+      <PlainPlan result={result} answers={answers} />
 
       <div className="quest-next">
         {result.path === "diagnostic" ? (
@@ -213,6 +210,36 @@ function QuestResult({ result, answers, onBook, onReplay }: { result: Result; an
       <ReportForm answers={answers} />
       <button type="button" className="quest-replay" onClick={onReplay}>Play again with another workflow</button>
     </div>
+  );
+}
+
+/** The result as four plain steps, the same four the story shows: your pile, your agent, a person checks, time back. */
+function PlainPlan({ result, answers }: { result: Result; answers: Answers }) {
+  const job = ROUNDS[1].kind === "choice" ? ROUNDS[1].choices.find((c) => c.id === answers.bottleneck)?.label : undefined;
+  const hours = answers.hours ?? 0;
+  const back = Math.round((result.hoursPerYear / 3) / 10) * 10;
+  return (
+    <ol className="quest-plan" aria-label="Your plan, in plain words">
+      <li>
+        <span className="quest-plan-step">Your pile</span>
+        <p><b>{job ?? "Your repeat work"}</b>: about {hours} hours a week, or about <b>{result.hoursPerYear.toLocaleString("en-US")} hours a year</b> across your team.</p>
+      </li>
+      {result.agent ? (
+        <li className="quest-agent">
+          <span className="quest-plan-step">Your first agent</span>
+          <h4>{result.agent.name}</h4>
+          <p>{result.agent.does}</p>
+        </li>
+      ) : null}
+      <li>
+        <span className="quest-plan-step">A person checks</span>
+        <p>{result.agent ? `${result.agent.decides} ` : ""}{APPROVAL_LINE[answers.approval ?? ""] ?? ""}</p>
+      </li>
+      <li>
+        <span className="quest-plan-step">What you could get back</span>
+        <p>If the agent takes on just a third of it, that is about <b>{back.toLocaleString("en-US")} hours a year</b> back for your team. A rough guess; the Diagnostic works out the real number.</p>
+      </li>
+    </ol>
   );
 }
 

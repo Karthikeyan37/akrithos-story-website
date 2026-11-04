@@ -9,17 +9,17 @@ const links = {
   form: "https://api.leadconnectorhq.com/widget/form/NF6k2MmqcnTNqAfG3Fxd",
 } as const;
 const MOCK = "http://127.0.0.1:3999/__calls";
-const sectionIds = ["top", "quest", "story", "platform", "live-agent", "security", "diagnostic", "team", "live-program", "faq"];
+const sectionIds = ["top", "story", "quest", "platform", "live-agent", "security", "diagnostic", "team", "live-program", "faq"];
 
 test("the story, the sections and the people are all there", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveTitle(/Akrithos/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Your best people are buried in work a machine should do.");
   expect(await page.locator("main > section").evaluateAll((s) => s.map((x) => x.id))).toEqual(sectionIds);
-  await expect(page.locator("main .story [data-chapter]")).toHaveCount(5);
+  await expect(page.locator("main .story [data-chapter]")).toHaveCount(6);
   await expect(page.locator("#team img")).toHaveCount(3);
-  // The 3D world either draws or leaves the poster; it never leaves the page broken.
-  await expect.poll(() => page.locator(".world").getAttribute("data-state"), { timeout: 30_000 }).toMatch(/ready|failed/);
+  // The story layer (3D world or artwork) either draws or leaves the poster; it never leaves the page broken.
+  await expect.poll(() => page.locator(".world, .story-art").getAttribute("data-state"), { timeout: 30_000 }).toMatch(/ready|failed/);
 });
 
 test("checkout, account and training destinations are unchanged", async ({ page }) => {
@@ -47,13 +47,13 @@ test("four systems show the business effect and where people decide", async ({ p
   }
 });
 
-test("Agent Quest: seven rounds, a level, and the report reaches the CRM with consent only", async ({ page, request }) => {
+test("Agent Quest: seven questions, a plain plan, and the report reaches the CRM with consent only", async ({ page, request }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/#quest");
   const quest = page.locator("#quest");
-  const next = quest.getByRole("button", { name: /Next round|Reveal my result/ });
+  const next = quest.getByRole("button", { name: /Next question|Show my plan/ });
   await expect(next).toBeDisabled();
-  for (const choice of ["Healthcare or home care", "Chasing and qualifying leads", null, /Inside a CRM/, /Regulated data/, /named expert/, "This quarter"]) {
+  for (const choice of ["Healthcare or home care", "Following up with people who might buy", null, /main software/, /Health or money records/, /right expert/, "In the next 3 months"]) {
     if (choice === null) await quest.locator('input[type="range"]').fill("60");
     else await quest.getByRole("button", { name: choice }).click();
     await next.click();
@@ -61,6 +61,11 @@ test("Agent Quest: seven rounds, a level, and the report reaches the CRM with co
   await expect(quest.getByText("Your first agent", { exact: true })).toBeVisible();
   await expect(quest.getByRole("heading", { name: "Revenue agent" })).toBeVisible();
   await expect(quest.getByText(/2,880 hours a year/)).toBeVisible();
+  // The plan uses the same four steps as the story, in the visitor's own terms.
+  const plan = quest.getByRole("list", { name: "Your plan, in plain words" });
+  await expect(plan.getByText("Your pile", { exact: true })).toBeVisible();
+  await expect(plan.getByText(/The right expert says yes/)).toBeVisible();
+  await expect(plan.getByText(/about 960 hours a year/)).toBeVisible();
 
   const email = `quest-${test.info().project.name}-${Date.now()}@example.com`;
   await quest.getByLabel("First name").fill("Avery");
@@ -155,7 +160,10 @@ test("the showcase never moves on by itself, and plays again on request", async 
   const showcase = page.locator("#platform");
   const stage = showcase.locator(".showcase-stage");
   await expect(showcase.getByRole("tab", { name: /Revenue agent/ })).toHaveAttribute("aria-selected", "true");
-  await expect(stage).toHaveAttribute("data-step", "3", { timeout: 15_000 });
+  // It shows the finished state, plays once when first seen (4 steps of 2.6s), then holds.
+  await stage.scrollIntoViewIfNeeded();
+  await page.waitForTimeout(9500);
+  await expect(stage).toHaveAttribute("data-step", "3");
   await page.waitForTimeout(4000);
   await expect(showcase.getByRole("tab", { name: /Revenue agent/ })).toHaveAttribute("aria-selected", "true");
   await expect(stage).toHaveAttribute("data-step", "3");
@@ -164,16 +172,17 @@ test("the showcase never moves on by itself, and plays again on request", async 
   await expect(showcase.locator(".showcase-now")).toHaveText(/Work comes in/);
 });
 
-test("the first screen starts Agent Quest with the answer kept", async ({ page }, testInfo) => {
-  test.skip(testInfo.project.name !== "desktop-chromium", "the first-screen question shows on wide screens; phones get the quest next");
+test("the end of the story starts Agent Quest with the answer kept", async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== "desktop-chromium", "the story's first question shows on wide screens; phones get the quest next");
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
-  const opener = page.locator(".hero-quest");
-  await opener.getByRole("button", { name: "Financial services" }).click();
+  const opener = page.locator(".quest-start");
+  await opener.scrollIntoViewIfNeeded();
+  await opener.getByRole("button", { name: "Banking, insurance or money" }).click();
   const quest = page.locator("#quest");
-  await expect(quest.getByRole("button", { name: "Financial services" })).toHaveAttribute("aria-pressed", "true");
-  await expect(quest.getByRole("button", { name: "Next round" })).toBeEnabled();
-  await expect(quest.getByRole("button", { name: "Next round" })).toBeFocused();
+  await expect(quest.getByRole("button", { name: "Banking, insurance or money" })).toHaveAttribute("aria-pressed", "true");
+  await expect(quest.getByRole("button", { name: "Next question" })).toBeEnabled();
+  await expect(quest.getByRole("button", { name: "Next question" })).toBeFocused();
 });
 
 test("picking an agent in the story opens that agent below", async ({ page }) => {
@@ -183,4 +192,14 @@ test("picking an agent in the story opens that agent below", async ({ page }) =>
   await expect(showcase.getByRole("tab", { name: /Operations control/ })).toHaveAttribute("aria-selected", "true");
   await expect(showcase.getByRole("tab", { name: /Operations control/ })).toBeInViewport();
   await expect(showcase.getByRole("tabpanel")).toBeInViewport();
+});
+
+test("the story always says what comes next, and goes there on request", async ({ page }) => {
+  await page.goto("/");
+  const cue = page.locator(".story-cue");
+  await expect(cue).toContainText("Step 1 of 6");
+  await expect(cue).toContainText("Next: The pile keeps growing");
+  await cue.click();
+  await expect(cue).toContainText("Step 2 of 6", { timeout: 10_000 });
+  await expect(cue).toContainText("Next: An agent sorts the pile");
 });

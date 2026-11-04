@@ -1828,17 +1828,11 @@ h1, h2, h3, h4 { font-family: "Space Grotesk", Arial, sans-serif; color: var(--n
 /* ── The 3D world (fixed behind the story) ── */
 .world { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; contain: strict; }
 .world-poster { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(60% 55% at 70% 45%, rgba(232, 113, 74, 0.16), transparent 70%), radial-gradient(50% 40% at 20% 90%, rgba(212, 163, 95, 0.08), transparent 70%), var(--n-bg); }
-.world-poster-peak { width: min(60vw, 34rem); transform: translateX(18%); opacity: 0.9; }
 .world-canvas { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity 1.2s ease; }
 .world[data-state="ready"] .world-canvas { opacity: 1; }
 .world[data-state="failed"] .world-canvas { display: none; }
-.world-labels { position: absolute; inset: 0; }
-html[data-world="off"] .world-labels { display: none; }
-.world-label { position: absolute; left: 0; top: 0; margin: -0.9rem 0 0 1rem; display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0.75rem; border-radius: 8px; border: 1px solid rgba(212, 163, 95, 0.45); background: rgba(12, 14, 17, 0.72); color: var(--n-text); font: 600 0.82rem "Public Sans", Arial, sans-serif; white-space: nowrap; pointer-events: auto; transition: opacity .35s ease, border-color .2s ease, background-color .2s ease; backdrop-filter: blur(6px); }
-.world-label i { width: 6px; height: 6px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 8px var(--gold); }
-.world-label:hover, .world-label:focus-visible { border-color: var(--ember); background: rgba(28, 32, 39, 0.92); }
-.world-label[data-visible="false"] { opacity: 0; visibility: hidden; pointer-events: none; }
-@media (hover: none) { .world-label { font-size: 0.75rem; } }
+/* A soft dark band at the top keeps the logo, its tagline and the menu readable over the lit door. */
+.world::after { content: ""; position: absolute; inset: 0 0 auto 0; height: 10rem; background: linear-gradient(180deg, rgba(11, 11, 12, 0.9), rgba(11, 11, 12, 0.55) 45%, rgba(11, 11, 12, 0)); pointer-events: none; }
 
 /* ── The story ── */
 #main { position: relative; z-index: 1; }
@@ -1908,7 +1902,7 @@ html[data-world="off"] .world-labels { display: none; }
 .quest-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; gap: 0.75rem; }
 .quest-flash { position: absolute; right: 1.5rem; top: 4.4rem; padding: 0.4rem 0.8rem; border-radius: 8px; background: var(--gold); color: #1A1206; font-weight: 700; font-size: 0.88rem; animation: flash 1.6s ease forwards; pointer-events: none; }
 @keyframes flash { 0% { opacity: 0; transform: translateY(6px); } 15% { opacity: 1; transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-8px); } }
-.quest-map-title, .quest-level-label, .quest-agent-label { color: var(--n-faint); font-weight: 600; font-size: 0.9rem; }
+.quest-map-title, .quest-level-label { color: var(--n-faint); font-weight: 600; font-size: 0.9rem; }
 .quest-map-svg { width: 100%; max-width: 15rem; margin: 0.75rem auto 0; display: block; }
 .quest-orbit { fill: none; stroke: var(--n-line); stroke-dasharray: 2 5; }
 .quest-node line { stroke: var(--n-line); }
@@ -1940,10 +1934,17 @@ html[data-world="off"] .world-labels { display: none; }
 .quest-agent { margin-top: 1.5rem; padding: 1.25rem; border-radius: 14px; background: var(--n-raised); border: 1px solid rgba(212, 163, 95, 0.35); }
 .quest-agent h4 { font-size: 1.4rem; margin-top: 0.2rem; }
 .quest-agent p { color: var(--n-muted); margin-top: 0.5rem; line-height: 1.55; }
-.quest-agent-decides { color: var(--n-text) !important; }
-.quest-agent-decides span { color: var(--gold); }
-.quest-hours-at-stake { margin-top: 1.25rem; color: var(--n-muted); line-height: 1.6; }
-.quest-hours-at-stake b { color: var(--n-text); }
+/* The plan in plain words: the same four steps as the story, joined by a quiet line. */
+.quest-plan { list-style: none; margin: 1.5rem 0 0; padding: 0; display: grid; gap: 0.75rem; }
+.quest-plan li { position: relative; margin: 0; padding: 1rem 1.15rem 1rem 3rem; border-radius: 14px; background: var(--n-raised); border: 1px solid var(--n-line); }
+.quest-plan li::before { content: ""; position: absolute; left: 1.2rem; top: 1.3rem; width: 0.7rem; height: 0.7rem; border-radius: 50%; background: var(--n-muted); }
+.quest-plan li:not(:last-child)::after { content: ""; position: absolute; left: calc(1.55rem - 0.5px); top: 2.2rem; bottom: -0.8rem; width: 1px; background: var(--n-line); }
+.quest-plan .quest-agent { margin-top: 0; border-color: rgba(212, 163, 95, 0.45); }
+.quest-plan .quest-agent::before, .quest-plan li:last-child::before { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+.quest-plan li:nth-last-child(2)::before { background: var(--ember); box-shadow: 0 0 10px var(--ember); }
+.quest-plan-step { display: block; color: var(--gold); font-weight: 600; font-size: 0.9rem; }
+.quest-plan p { color: var(--n-muted); margin-top: 0.35rem; line-height: 1.55; }
+.quest-plan b { color: var(--n-text); }
 .quest-next { display: flex; flex-wrap: wrap; gap: 0.75rem; margin-top: 1.5rem; }
 .quest-form { margin-top: 2rem; padding-top: 1.75rem; border-top: 1px solid var(--n-line); }
 .quest-form-title { font: 600 1.25rem "Space Grotesk", Arial, sans-serif; }
@@ -2105,8 +2106,6 @@ html[data-world="off"] .world-labels { display: none; }
 .modal-panel .eyebrow { font-family: "Public Sans", Arial, sans-serif; text-transform: none; letter-spacing: 0; color: var(--gold); }
 .icon-button { color: var(--n-text); }
 .diagnostic-frame { background: #fff; }
-.world-gate { margin: -2.6rem 0 0 -5.5rem; border-color: rgba(232, 113, 74, 0.6); pointer-events: none; }
-.world-gate i { background: var(--ember); box-shadow: 0 0 8px var(--ember); }
 #main > section, .story { overflow-x: clip; }
 /* Kept components, brought in line with the design bans: no monospace labels, no shouting capitals. */
 .showcase-section .font-mono, .showcase-section .eyebrow, .showcase-section [class*="label"], .showcase-section [class*="legend"], .showcase-section [class*="effect"] p,
@@ -2121,8 +2120,7 @@ html[data-world="off"] .world-labels { display: none; }
 .offer-includes li::before { content: ""; position: absolute; left: 0; top: 0.5rem; width: 8px; height: 8px; border: 2px solid var(--gold); transform: rotate(45deg); }
 .offer-featured .offer-body { flex: none; }
 .offer-featured .offer-includes { flex: 1; align-content: start; }
-/* Phones: the scene stays, its labels and the guide's teaser step aside so the copy and buttons stay clear. */
-@media (max-width: 47.99rem) { .world-labels { display: none; } }
+/* Phones: the guide's teaser steps aside so the copy and buttons stay clear. */
 @media (max-width: 40rem) { .guide-teaser { display: none; } }
 
 /* ═══════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -2136,7 +2134,7 @@ html[data-world="off"] .world-labels { display: none; }
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 /* A 1px border drawn with a gradient, for glass panels. */
-.hero-quest-card::after, .showcase-stage::after {
+.quest-start-card::after, .showcase-stage::after {
   content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; background: var(--edge-warm); pointer-events: none; z-index: 30;
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
 }
@@ -2221,20 +2219,20 @@ html[data-world="off"] .world-labels { display: none; }
 /* The one sentence describing the step in progress. */
 .showcase-now { position: relative; z-index: 10; margin-top: 0.9rem; min-height: 1.6em; font-size: 1.12rem; line-height: 1.5; color: var(--n-text); font-weight: 500; }
 
-/* Screen one: the first question of Agent Quest beside the promise. Still, solid and easy to press. */
-.hero-quest { display: none; }
+/* End of the story: the first question of Agent Quest beside "your team gets its day back". Still, solid and easy to press. */
+.quest-start { display: none; }
 @media (min-width: 72rem) {
-  .hero-quest { display: block; position: absolute; right: calc(min(0px, (84rem - 100vw) / 2) + 2.75rem); top: 50%; transform: translateY(-46%); width: min(27rem, 34vw); }
+  .quest-start { display: block; position: absolute; right: calc(min(0px, (84rem - 100vw) / 2) + 2.75rem); top: 50%; transform: translateY(-46%); width: min(27rem, 34vw); }
 }
-.hero-quest-card { position: relative; border-radius: 18px; padding: 1.5rem; background: var(--glass); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.9), 0 0 60px -26px rgba(232, 113, 74, 0.45), var(--lift); }
-.chapter .hero-quest p { margin: 0; text-shadow: none; }
-.chapter .hero-quest-top { display: flex; justify-content: space-between; color: var(--gold); font-size: 0.9rem; font-weight: 600; }
-.chapter .hero-quest-top span:last-child { color: var(--n-muted); font-weight: 500; }
-.chapter .hero-quest-prompt { margin-top: 0.75rem; font: 600 1.6rem/1.2 "Space Grotesk", Arial, sans-serif; letter-spacing: -0.02em; color: var(--n-text); }
-.hero-quest-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; margin-top: 1.1rem; }
-.hero-quest-choice { min-height: 3.4rem; text-align: left; padding: 0.7rem 0.85rem; border-radius: 12px; border: 1px solid var(--n-line); background: var(--n-raised); color: var(--n-text); font-weight: 600; font-size: 0.95rem; line-height: 1.3; transition: border-color 0.2s ease, background-color 0.2s ease; }
-.hero-quest-choice:hover { border-color: var(--ember); background: rgba(232, 113, 74, 0.12); }
-.chapter .hero-quest-note { margin-top: 0.9rem; font-size: 0.88rem; color: var(--n-faint); }
+.quest-start-card { position: relative; border-radius: 18px; padding: 1.5rem; background: var(--glass); backdrop-filter: blur(14px) saturate(1.2); -webkit-backdrop-filter: blur(14px) saturate(1.2); box-shadow: 0 40px 90px -30px rgba(0, 0, 0, 0.9), 0 0 60px -26px rgba(232, 113, 74, 0.45), var(--lift); }
+.chapter .quest-start p { margin: 0; text-shadow: none; }
+.chapter .quest-start-top { display: flex; justify-content: space-between; color: var(--gold); font-size: 0.9rem; font-weight: 600; }
+.chapter .quest-start-top span:last-child { color: var(--n-muted); font-weight: 500; }
+.chapter .quest-start-prompt { margin-top: 0.75rem; font: 600 1.6rem/1.2 "Space Grotesk", Arial, sans-serif; letter-spacing: -0.02em; color: var(--n-text); }
+.quest-start-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; margin-top: 1.1rem; }
+.quest-start-choice { min-height: 3.4rem; text-align: left; padding: 0.7rem 0.85rem; border-radius: 12px; border: 1px solid var(--n-line); background: var(--n-raised); color: var(--n-text); font-weight: 600; font-size: 0.95rem; line-height: 1.3; transition: border-color 0.2s ease, background-color 0.2s ease; }
+.quest-start-choice:hover { border-color: var(--ember); background: rgba(232, 113, 74, 0.12); }
+.chapter .quest-start-note { margin-top: 0.9rem; font-size: 0.88rem; color: var(--n-faint); }
 
 /* Chapter three: four still buttons instead of moving targets. */
 .agent-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 1.5rem; }
@@ -2242,10 +2240,70 @@ html[data-world="off"] .world-labels { display: none; }
 .agent-pick strong { font-size: 1rem; line-height: 1.3; }
 .agent-pick span { color: var(--gold); font-size: 0.84rem; font-weight: 600; }
 .agent-pick:hover, .agent-pick:focus-visible { border-color: var(--ember); background: rgba(28, 32, 39, 0.96); }
-.world-label { pointer-events: none; }
-.world-label[data-focus="true"] { border-color: var(--ember); background: rgba(28, 32, 39, 0.92); }
 @media (max-width: 30rem) { .agent-picker { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .showcase-input[data-state="now"] li i, .showcase-human-gate[data-state="now"] i { animation: none !important; } }
 /* Work chips keep each word on one line and wrap as a row instead. */
 @media (min-width: 64rem) { .showcase-work { display: flex; flex-wrap: wrap; justify-content: center; width: auto; max-width: 15rem; } }
 .showcase-work li { white-space: nowrap; }
+
+/* The story guide: which step this is, what comes next, and a button to go there. Hidden outside the story. */
+.story-cue { position: fixed; z-index: 20; left: 50%; bottom: 1.25rem; display: grid; grid-template-columns: auto auto; column-gap: 0.85rem; align-items: center; min-height: 3.25rem; max-width: calc(100vw - 2rem); padding: 0.6rem 1rem 0.6rem 1.15rem; border-radius: 12px; border: 1px solid rgba(212, 163, 95, 0.45); background: rgba(12, 14, 17, 0.88); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: var(--n-text); text-align: left; transform: translateX(-50%); box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.9); transition: opacity 0.35s ease, border-color 0.2s ease, transform 0.35s ease; }
+.story-cue span { grid-column: 1; font-size: 0.82rem; color: var(--n-muted); }
+.story-cue strong { grid-column: 1; font-size: 1rem; line-height: 1.3; font-weight: 600; }
+.story-cue i { grid-column: 2; grid-row: 1 / span 2; width: 2rem; height: 2rem; border-radius: 50%; background: var(--ember); position: relative; }
+.story-cue i::after { content: ""; position: absolute; left: 50%; top: 42%; width: 0.5rem; height: 0.5rem; border-right: 2px solid #14100d; border-bottom: 2px solid #14100d; transform: translate(-50%, -50%) rotate(45deg); }
+.story-cue:hover, .story-cue:focus-visible { border-color: var(--ember); }
+.story-cue[data-visible="false"] { opacity: 0; visibility: hidden; transform: translate(-50%, 1rem); }
+@media (prefers-reduced-motion: no-preference) { .story-cue i { animation: cue-nudge 2.4s ease-in-out infinite; } }
+@keyframes cue-nudge { 0%, 70%, 100% { transform: translateY(0); } 35% { transform: translateY(4px); } }
+@media (max-width: 47.99rem) {
+  .story-cue { left: 1rem; transform: none; max-width: calc(100vw - 6.5rem); min-height: 0; padding: 0.5rem 0.75rem 0.5rem 0.9rem; }
+  .story-cue strong { font-size: 0.92rem; }
+  .story-cue[data-visible="false"] { transform: translateY(1rem); }
+  /* Room under each step's copy, so the guide never covers words or buttons. */
+  .story .chapter:not(.chapter-hero) { padding-bottom: 8.5rem; }
+  .story .chapter-final { padding-bottom: 9.5rem; }
+}
+
+/* ── The story as rendered artwork (src/config/story.ts): fixed behind the copy, crossfaded by scroll ── */
+.story-art { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: var(--n-bg); contain: strict; }
+.story-art[data-active="false"] { visibility: hidden; }
+/* Images and moving paper share one stage, so a slow push-in moves them together and the paper stays on its spots. */
+.story-art-stage { position: absolute; inset: 0; transform-origin: 72% 55%; will-change: transform; }
+.story-art-frame { position: absolute; inset: 0; opacity: 0; }
+.story-art-frame[data-frame="0"] { opacity: 1; }
+.story-art-frame img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; }
+.story-art-flow { position: absolute; inset: 0; z-index: 3; width: 100%; height: 100%; filter: drop-shadow(0 0.5rem 0.45rem rgba(0, 0, 0, 0.5)); }
+/* The pile and the box, cut out of the image (clip-path set in story-art.tsx), over the paper. */
+.story-art-cuts { position: absolute; inset: 0; z-index: 3; }
+.story-art-cut { position: absolute; inset: 0; opacity: 0; }
+.story-art-cut[data-cut="0"] { opacity: 1; }
+.story-art-cut img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 50%; }
+/* Keep the copy side calm: a soft dark wash on the left, behind the text (over the paper too). */
+.story-art-stage::after { content: ""; position: absolute; inset: 0; z-index: 4; background: linear-gradient(90deg, rgba(11, 11, 12, 0.85) 0%, rgba(11, 11, 12, 0.35) 38%, rgba(11, 11, 12, 0) 60%); }
+@media (max-width: 47.99rem) {
+  .story-art-frame img, .story-art-cut img { object-position: 74% 50%; }
+  .story-art-stage::after { background: linear-gradient(180deg, rgba(11, 11, 12, 0.55) 0%, rgba(11, 11, 12, 0.1) 40%, rgba(11, 11, 12, 0.75) 100%); }
+}
+/* The scene keeps the left side clear (artwork or 3D), so every step's copy sits on the left. */
+:is(.story-art, .world) ~ main .chapter-right { justify-content: flex-start; }
+
+/* The person's inner thought at each step: a quiet quote under the headline, coloured by how they feel. */
+.chapter .chapter-thought { display: flex; align-items: center; gap: 0.85rem; margin-top: 1.1rem; padding-left: 0.9rem; border-left: 2px solid var(--ember); }
+.chapter .chapter-thought p { margin: 0; display: grid; gap: 0.15rem; font-size: clamp(1.05rem, 1.3vw, 1.2rem); font-style: italic; line-height: 1.4; color: var(--n-text); }
+.chapter-face { flex: none; width: 3.5rem; height: 3.5rem; border-radius: 50%; object-fit: cover; border: 2px solid var(--ember); box-shadow: 0 0 18px -4px var(--ember); }
+.chapter .chapter-mood { font-style: normal; font-size: 0.82rem; font-weight: 600; color: var(--ember); }
+#story .chapter:nth-child(n + 2) .chapter-face { border-color: var(--gold); box-shadow: 0 0 18px -4px var(--gold); }
+#story .chapter:nth-child(n + 2) .chapter-mood { color: var(--gold); }
+#story .chapter:nth-child(n + 2) .chapter-thought { border-left-color: var(--gold); } /* gold once help arrives */
+/* Artwork mode: a soft dark band at the top keeps the menu readable over bright parts of the image. */
+.story-art::after { content: ""; position: absolute; inset: 0 0 auto 0; height: 9rem; z-index: 3; background: linear-gradient(180deg, rgba(11, 11, 12, 0.8), rgba(11, 11, 12, 0)); pointer-events: none; }
+/* Artwork mode, last step: the Agent Quest card sits under the copy, so the happy face stays in view. */
+@media (min-width: 72rem) {
+  :is(.story-art, .world) ~ main .chapter-final { flex-direction: column; align-items: flex-start; justify-content: center; }
+  :is(.story-art, .world) ~ main .chapter-final .quest-start { position: static; transform: none; width: min(30rem, 100%); margin-top: 1.75rem; }
+  /* The thought already says it, so the card takes the place of the extra lines and buttons. */
+  :is(.story-art, .world) ~ main .chapter-final .chapter-copy > p, :is(.story-art, .world) ~ main .chapter-final .hero-actions { display: none; }
+}
+/* Phones, first screen: the copy sits over the busiest part of the image, so the wash is darker there. */
+@media (max-width: 47.99rem) { .story-art-frame[data-frame="0"]::after, .story-art-cut[data-cut="0"]::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(11, 11, 12, 0.88) 0%, rgba(11, 11, 12, 0.72) 70%, rgba(11, 11, 12, 0.8) 100%); } }

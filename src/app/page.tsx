@@ -6,13 +6,33 @@ import { AgentQuest } from "@/components/agent-quest";
 import { AskButton } from "@/components/ask-akrithos-link";
 import { BookingButton } from "@/components/booking-provider";
 import { Header } from "@/components/header";
-import { HeroQuestStart } from "@/components/hero-quest-start";
+import { PageMotion } from "@/components/page-motion";
 import { ProductShowcase } from "@/components/product-showcase";
+import { QuestStart } from "@/components/quest-start";
 import { ReadinessPanel } from "@/components/readiness-panel";
 import { Reveal } from "@/components/reveal";
+import { StoryArt } from "@/components/story-art";
 import { StoryDepth } from "@/components/story-depth";
 import { WorldStage } from "@/components/world/world-stage";
 import { integrations } from "@/config/integrations";
+import { storyArt, storyMood } from "@/config/story";
+
+/** The story's six steps, in a few plain words, for the "what comes next" guide. */
+const STORY_STEPS = ["The problem", "The pile keeps growing", "An agent sorts the pile", "Your information stays inside", "A person checks what matters", "Your team gets its day back"] as const;
+
+/** What the person in the story thinks at this step, in their own words: the feeling visitors should recognise. */
+function Thought({ step }: { step: number }) {
+  const { thought, mood, face } = storyMood.steps[step];
+  return (
+    <div className="chapter-thought">
+      {face ? <Image src={face} alt="" width={96} height={96} className="chapter-face" /> : null}
+      <p>
+        <span className="sr-only">They think: </span>&ldquo;{thought}&rdquo;
+        <span className="chapter-mood">{mood}</span>
+      </p>
+    </div>
+  );
+}
 
 const controls = [
   ["Your data stays put", "Your data stays where your rules say: in the cloud region you choose, on your own servers, or a mix."],
@@ -47,67 +67,82 @@ export default function HomePage() {
     <>
       <a href="#main" className="skip-link">Skip to content</a>
       <Header />
-      <WorldStage />
+      <PageMotion />
+      {storyArt.ready ? <StoryArt /> : <WorldStage />}
 
       <main id="main">
-        <section id="top" className="story story-hero" aria-label="What Akrithos does">
-          <StoryDepth chapters={5} />
+        <section id="top" className="story story-hero" aria-label="The problem">
+          <StoryDepth steps={STORY_STEPS} />
           <div data-chapter className="chapter chapter-hero">
             <div className="chapter-copy">
               <h1 className="hero-title">Your best people are buried in work a machine should do.</h1>
-              <p className="hero-lead">We build AI helpers, called agents, that do the repeat work for your team. Your data stays safe, and your people still make the big decisions.</p>
+              <Thought step={0} />
+              <p className="hero-lead">Calls, emails, forms and bills land on your team&rsquo;s desk all day. The same jobs, again and again, until the pile is too big to finish.</p>
               <div className="hero-actions">
-                <a href="#quest" className="button button-primary button-large">Play Agent Quest</a>
-                <AskButton className="button button-ghost button-large">Ask Akrithos anything</AskButton>
+                <a href="#story" className="button button-primary button-large">See how we clear the pile</a>
+                <a href="#quest" className="button button-ghost button-large">Skip to Agent Quest</a>
               </div>
-              <p className="hero-note">Takes 2 minutes. No sign-up. Find out which agent would help you most.</p>
+              <p className="hero-note">Scroll down to watch an AI helper sort the pile, step by step.</p>
             </div>
-            <HeroQuestStart />
           </div>
         </section>
 
-        <section id="quest" className="section night-section quest-section" aria-labelledby="quest-title">
-          <div className="wrap">
-            <Reveal className="section-head">
-              <h2 id="quest-title">Agent Quest: find the agent your business needs.</h2>
-              <p>7 quick questions. Each answer teaches you something, and at the end you will see which agent fits you best. About 2 minutes, no sign-up.</p>
-            </Reveal>
-            <AgentQuest />
-          </div>
-        </section>
-
-        <section id="story" className="story" aria-label="How an agent works">
+        <section id="story" className="story" aria-label="How an agent clears the pile">
           <div data-chapter id="chapter-work" className="chapter chapter-left">
             <div className="chapter-copy">
-              <h2>Work arrives from everywhere.</h2>
-              <p>Emails, calls, forms, invoices and the same questions, over and over. Most of it is repeat work, and repeat work is exactly what agents are good at.</p>
+              <h2>The pile keeps growing.</h2>
+              <Thought step={1} />
+              <p>More work arrives than your team can finish. Things start to slip: a missed call, a late bill, a customer who gives up and goes somewhere else.</p>
             </div>
           </div>
 
           <div data-chapter className="chapter chapter-right">
             <div className="chapter-copy">
-              <h2>One agent. One job. Done the same way every time.</h2>
-              <p>Each agent has one clear job, like answering new enquiries or answering questions from your documents. Pick one to see how it works.</p>
+              <h2>An agent sorts the pile.</h2>
+              <Thought step={2} />
+              <p>An agent is an AI helper with one job. It picks up each piece of work, sorts it and does the easy parts, the same way every time. Nothing gets lost. There are four kinds; tap one to see it work.</p>
               <AgentPicker />
             </div>
           </div>
 
           <div data-chapter className="chapter chapter-left">
             <div className="chapter-copy">
-              <h2>Your data stays with you.</h2>
-              <p>It stays in your region or on your own servers. Each agent sees only what its job needs, and every step is recorded.</p>
+              <h2>Your information stays inside.</h2>
+              <Thought step={3} />
+              <p>Everything stays in your region or on your own servers. Each agent only sees what its job needs, and every step is written down.</p>
+            </div>
+          </div>
+
+          <div data-chapter className="chapter chapter-right">
+            <div className="chapter-copy">
+              <h2>A person checks what matters.</h2>
+              <Thought step={4} />
+              <p>Most jobs are finished for you. The few that need a decision go to a person, with everything they need to say yes or no.</p>
             </div>
           </div>
 
           <div data-chapter className="chapter chapter-left chapter-final">
             <div className="chapter-copy">
-              <h2>Your people still decide.</h2>
-              <p>Agents get the work ready. A person checks anything important before it goes out. That is how AI earns your trust.</p>
+              <h2>Your team gets its day back.</h2>
+              <Thought step={5} />
+              <p>The pile is gone. Your people spend their time on the work only people can do.</p>
+              <p className="chapter-ask">Does this sound like your business? Agent Quest shows what an agent would do for you, in 7 quick questions.</p>
               <div className="hero-actions">
                 <a href="#quest" className="button button-primary">Play Agent Quest</a>
                 <BookingButton className="button button-ghost">Book your Diagnostic</BookingButton>
               </div>
             </div>
+            <QuestStart />
+          </div>
+        </section>
+
+        <section id="quest" className="section night-section quest-section" aria-labelledby="quest-title">
+          <div className="wrap">
+            <Reveal className="section-head">
+              <h2 id="quest-title">Agent Quest: what would an agent do for you?</h2>
+              <p>7 quick questions about your business. At the end you get a simple plan: your pile, your agent, what a person checks, and the time you could get back. About 2 minutes, no sign-up.</p>
+            </Reveal>
+            <AgentQuest />
           </div>
         </section>
 
